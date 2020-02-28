@@ -127,3 +127,12 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# From SQuAD repo
+
+.DS_Store
+.idea/
+__pycache__
+.texpadtmp/
+data/
+save/
