@@ -1,7 +1,4 @@
 """Utility classes and methods.
-
-Author:
-    Chris Chute (chute@stanford.edu)
 """
 import logging
 import os

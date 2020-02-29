@@ -24,6 +24,8 @@ from subprocess import run
 from tqdm import tqdm
 from zipfile import ZipFile
 
+SOS = "--SOS--"
+EOS = "--EOS--"
 
 def download_url(url, output_path, show_progress=True):
     class DownloadProgressBar(tqdm):
@@ -111,6 +113,7 @@ def process_file(filename, data_type, word_counter, char_counter):
                     ques = qa["question"].replace(
                         "''", '" ').replace("``", '" ')
                     ques_tokens = word_tokenize(ques)
+                    ques_tokens = [SOS] + ques_tokens + [EOS]
                     ques_chars = [list(token) for token in ques_tokens]
                     for token in ques_tokens:
                         word_counter[token] += 1
@@ -170,11 +173,17 @@ def get_embedding(counter, data_type, limit=-1, emb_file=None, vec_size=None, nu
 
     NULL = "--NULL--"
     OOV = "--OOV--"
-    token2idx_dict = {token: idx for idx, token in enumerate(embedding_dict.keys(), 2)}
+
+    token2idx_dict = {token: idx for idx, token in enumerate(embedding_dict.keys(), 4)}
     token2idx_dict[NULL] = 0
     token2idx_dict[OOV] = 1
+    token2idx_dict[SOS] = 2
+    token2idx_dict[EOS] = 3
     embedding_dict[NULL] = [0. for _ in range(vec_size)]
     embedding_dict[OOV] = [0. for _ in range(vec_size)]
+    embedding_dict[SOS] = [0. for _ in range(vec_size)]
+    embedding_dict[EOS] = [0. for _ in range(vec_size)]
+    
     idx2emb_dict = {idx: embedding_dict[token]
                     for token, idx in token2idx_dict.items()}
     emb_mat = [idx2emb_dict[idx] for idx in range(len(idx2emb_dict))]
