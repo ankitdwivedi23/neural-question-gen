@@ -87,7 +87,7 @@ def main(args):
 
             # Get F1 and EM scores
             p = log_p.exp()
-            pred_dict[cw_idxs] = util.beamSearch(p)
+            pred_dict[cw_idxs] = util.beamSearch(model, cw_idxs, qw_idxs, p)
 
             # Log info
             progress_bar.update(batch_size)

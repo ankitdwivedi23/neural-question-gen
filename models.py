@@ -26,8 +26,10 @@ class Seq2Seq(nn.Module):
         super(Seq2Seq, self).__init__()
         
         self.device = device
+
+        self.word_vectors = word_vectors
         
-        self.embedding = layers.Embedding(word_vectors=word_vectors,
+        self.emb = layers.Embedding(word_vectors=word_vectors,
                                     hidden_size=hidden_size,
                                     drop_prob=drop_prob)
 
