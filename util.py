@@ -14,7 +14,7 @@ import numpy as np
 import ujson as json
 
 from collections import Counter
-
+Hypothesis = namedtuple('Hypothesis', ['value', 'score'])
 
 class SQuAD(data.Dataset):
     """Stanford Question Answering Dataset (SQuAD).
@@ -543,66 +543,95 @@ def torch_from_json(path, dtype=torch.float32):
 
     return tensor
 
-
-def discretize(p_start, p_end, max_len=15, no_answer=False):
-    """Discretize soft predictions to get start and end indices.
-
-    Choose the pair `(i, j)` of indices that maximizes `p1[i] * p2[j]`
-    subject to `i <= j` and `j - i + 1 <= max_len`.
+def beamSearch(model, cw_idxs, qw_idxs, beam_size: int=3, max_decoding_time_step: int=70)-> List[Hypothesis]:
+    """Discretize soft predictions to get question text.
 
     Args:
-        p_start (torch.Tensor): Soft predictions for start index.
-            Shape (batch_size, context_len).
-        p_end (torch.Tensor): Soft predictions for end index.
-            Shape (batch_size, context_len).
-        max_len (int): Maximum length of the discretized prediction.
-            I.e., enforce that `preds[i, 1] - preds[i, 0] + 1 <= max_len`.
-        no_answer (bool): Treat 0-index as the no-answer prediction. Consider
-            a prediction no-answer if `preds[0, 0] * preds[0, 1]` is greater
-            than the probability assigned to the max-probability span.
+        model: NN Model
+        cw_idxs (torch.Tensor): context word Index 
+            Shape (batch_size, c_len)
+        qw_idxs (torch.Tensor): Target question word Index 
+            Shape (batch_size, q_len)
+        p (torch.Tensor): Soft predictions for question word index.
+            Shape (batch_size, q_len, vocab_size).
+        beam_size (Int): size of beam
+        max_decoding_time_step (Int): maximum number of time steps to unroll the decoding RNN
 
     Returns:
-        start_idxs (torch.Tensor): Hard predictions for start index.
-            Shape (batch_size,)
-        end_idxs (torch.Tensor): Hard predictions for end index.
-            Shape (batch_size,)
+        hypotheses (List[Hypothesis]): a list of hypothesis, each hypothesis has two fields:
+                value: List[str]: the decoded target question, represented as a list of words
+                score: float: the log-likelihood of the target question
     """
-    if p_start.min() < 0 or p_start.max() > 1 \
-            or p_end.min() < 0 or p_end.max() > 1:
-        raise ValueError('Expected p_start and p_end to have values in [0, 1]')
+    SOS = "--SOS--"
+    EOS = "--EOS--"
+    
+    batch_size, c_len = tuple(cw_idxs.shape())
 
-    # Compute pairwise probabilities
-    p_start = p_start.unsqueeze(dim=2)
-    p_end = p_end.unsqueeze(dim=1)
-    p_joint = torch.matmul(p_start, p_end)  # (batch_size, c_len, c_len)
+    c_emb = model.emb(cw_idxs)         # (batch_size, c_len, hidden_size)
+    c_enc, dec_init_state = model.encoder(c_emb, c_len)    # (batch_size, c_len, 2 * hidden_size)
 
-    # Restrict to pairs (i, j) such that i <= j <= i + max_len - 1
-    c_len, device = p_start.size(1), p_start.device
-    is_legal_pair = torch.triu(torch.ones((c_len, c_len), device=device))
-    is_legal_pair -= torch.triu(torch.ones((c_len, c_len), device=device),
-                                diagonal=max_len)
-    if no_answer:
-        # Index 0 is no-answer
-        p_no_answer = p_joint[:, 0, 0].clone()
-        is_legal_pair[0, :] = 0
-        is_legal_pair[:, 0] = 0
-    else:
-        p_no_answer = None
-    p_joint *= is_legal_pair
+    h_tm1 = dec_init_state
+    eos_id = 3 # HARD CODING!!!
+    vocab_size = len(model.word_vectors)
 
-    # Take pair (i, j) that maximizes p_joint
-    max_in_row, _ = torch.max(p_joint, dim=2)
-    max_in_col, _ = torch.max(p_joint, dim=1)
-    start_idxs = torch.argmax(max_in_row, dim=-1)
-    end_idxs = torch.argmax(max_in_col, dim=-1)
+    hypotheses = [[SOS]]
+    hyp_scores = torch.zeros(len(hypotheses), dtype=torch.float, device=model.device)
+    completed_hypotheses = []
 
-    if no_answer:
-        # Predict no-answer whenever p_no_answer > max_prob
-        max_prob, _ = torch.max(max_in_col, dim=-1)
-        start_idxs[p_no_answer > max_prob] = 0
-        end_idxs[p_no_answer > max_prob] = 0
+    t = 0
+    while len(completed_hypotheses) < beam_size and t < max_decoding_time_step:
+        t += 1
+        hyp_num = len(hypotheses)
 
-    return start_idxs, end_idxs
+        exp_c_enc = c_enc.expand(hyp_num, c_enc.size(1), c_enc.size(2))
+
+        # (batch_size, 1)
+        y_tm1 = torch.tensor([word2idx_dict[hyp[-1]] for hyp in hypotheses], dtype=torch.long, device=model.device)
+        
+        h_t, log_p_t  = model.step(y_tm1, h_tm1)
+
+        live_hyp_num = beam_size - len(completed_hypotheses)
+        contiuating_hyp_scores = (hyp_scores.unsqueeze(1).expand_as(log_p_t) + log_p_t).contiguous().view(-1)
+        top_cand_hyp_scores, top_cand_hyp_pos = torch.topk(contiuating_hyp_scores, k=live_hyp_num)
+
+        prev_hyp_ids = top_cand_hyp_pos / vocab_size
+        hyp_word_ids = top_cand_hyp_pos % vocab_size
+
+        new_hypotheses = []
+        live_hyp_ids = []
+        new_hyp_scores = []
+
+        for prev_hyp_id, hyp_word_id, cand_new_hyp_score in zip(prev_hyp_ids, hyp_word_ids, top_cand_hyp_scores):
+            prev_hyp_id = prev_hyp_id.item()
+            hyp_word_id = hyp_word_id.item()
+            cand_new_hyp_score = cand_new_hyp_score.item()
+
+            hyp_word = str(hyp_word_id) # Have to add idx2Word somehow self.vocab.tgt.id2word[hyp_word_id]
+            new_hyp_sent = hypotheses[prev_hyp_id] + [hyp_word]
+            if hyp_word_id == eos_id:
+                completed_hypotheses.append(Hypothesis(value=new_hyp_sent[1:-1],
+                                                        score=cand_new_hyp_score))
+            else:
+                new_hypotheses.append(new_hyp_sent)
+                live_hyp_ids.append(prev_hyp_id)
+                new_hyp_scores.append(cand_new_hyp_score)
+
+        if len(completed_hypotheses) == beam_size:
+            break
+
+        live_hyp_ids = torch.tensor(live_hyp_ids, dtype=torch.long, device=self.device)
+        h_tm1 = h_t[live_hyp_ids]
+
+        hypotheses = new_hypotheses
+        hyp_scores = torch.tensor(new_hyp_scores, dtype=torch.float, device=self.device)
+
+    if len(completed_hypotheses) == 0:
+        completed_hypotheses.append(Hypothesis(value=hypotheses[0][1:],
+                                                score=hyp_scores[0].item()))
+
+    completed_hypotheses.sort(key=lambda hyp: hyp.score, reverse=True)
+
+    return hypotheses
 
 
 def convert_tokens(eval_dict, qa_id, y_start_list, y_end_list, no_answer):
