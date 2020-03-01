@@ -543,7 +543,7 @@ def torch_from_json(path, dtype=torch.float32):
 
     return tensor
 
-def beamSearch(model, cw_idxs, qw_idxs, p, beam_size: int=3, max_decoding_time_step: int=70)-> List[Hypothesis]:
+def beamSearch(model, cw_idxs, qw_idxs, beam_size: int=3, max_decoding_time_step: int=70)-> List[Hypothesis]:
     """Discretize soft predictions to get question text.
 
     Args:

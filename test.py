@@ -67,7 +67,7 @@ def main(args):
     # Evaluate
     log.info(f'Evaluating on {args.split} split...')
     nll_meter = util.AverageMeter()
-    pred_dict = {}  # Predictions for TensorBoard
+    pred_dict = {}  # Predictions by Beam Search
     eval_file = vars(args)[f'{args.split}_eval_file']
     with open(eval_file, 'r') as fh:
         gold_dict = json_load(fh)
@@ -80,15 +80,15 @@ def main(args):
             batch_size = cw_idxs.size(0)
 
             # Forward
-            log_p = model(cw_idxs, qw_idxs)
             y = nn.functional.one_hot(qw_idxs, num_classes=len(word_vectors))
-            loss = F.nll_loss(log_p, y)
-            nll_meter.update(loss.item(), batch_size)
+            hypotheses = util.beamSearch(model, cw_idxs, qw_idxs)
+            loss = 0.
+            pred_dict[cw_idxs] = []
 
-            # Get F1 and EM scores
-            p = log_p.exp()
-            pred_dict[cw_idxs] = util.beamSearch(model, cw_idxs, qw_idxs, p)
-
+            for hyp in hypotheses
+                loss = loss + hyp.score
+                pred_dict[cw_idxs].append(hyp.value)
+            nll_meter.update(loss, batch_size)
             # Log info
             progress_bar.update(batch_size)
             if args.split != 'test':
