@@ -113,8 +113,9 @@ def main(args):
                 log_p = model(cw_idxs, qw_idxs)        #(batch_size, q_len, vocab_size)
                 
                 log_p = log_p.contiguous().view(log_p.size(0) * log_p.size(1), log_p.size(2))
-                qw_idxs = qw_idxs.contiguous().view(qw_idxs.size(0) * qw_idxs.size(1), qw_idxs.size(2))
-                loss = F.nll_loss(log_p, qw_idxs, reduction='sum')
+                qw_idxs_target = qw_idxs[:, 1:]     # omitting leading `SOS`
+                qw_idxs_target = qw_idxs_target.contiguous().view(qw_idxs_target.size(0) * qw_idxs_target.size(1))
+                loss = F.nll_loss(log_p, qw_idxs_target, ignore_index=0, reduction='sum')
                 loss_val = loss.item()
 
                 # Backward
@@ -170,7 +171,8 @@ def evaluate(model, data_loader, device, use_squad_v2):
     cum_tgt_words = 0.
 
     # no_grad() signals backend to throw away all gradients
-    with torch.no_grad():
+    with torch.no_grad(), \
+        tqdm(total=len(data_loader.dataset)) as progress_bar:
         for cw_idxs, cc_idxs, qw_idxs, qc_idxs, y1, y2, ids in data_loader:
             # Setup for forward
             cw_idxs = cw_idxs.to(device)
@@ -181,21 +183,24 @@ def evaluate(model, data_loader, device, use_squad_v2):
             log_p = model(cw_idxs, qw_idxs)        #(batch_size, q_len, vocab_size)
                 
             log_p = log_p.contiguous().view(log_p.size(0) * log_p.size(1), log_p.size(2))
-            qw_idxs = qw_idxs.contiguous().view(qw_idxs.size(0) * qw_idxs.size(1), qw_idxs.size(2))
-            loss = F.nll_loss(log_p, qw_idxs, reduction='sum')
+            qw_idxs_target = qw_idxs[:, 1:]     # omitting leading `SOS`
+            qw_idxs_target = qw_idxs_target.contiguous().view(qw_idxs_target.size(0) * qw_idxs_target.size(1))
+            loss = F.nll_loss(log_p, qw_idxs_target, ignore_index=0, reduction='sum')
             nll_meter.update(loss.item(), batch_size)
 
             # Calculate perplexity
             cum_loss += loss.item()
-            q_mask = torch.zeros_like(qw_idxs) != qw_idxs
+            q_mask = torch.zeros_like(qw_idxs_target) != qw_idxs_target
             q_len = q_mask.sum(-1)
-            tgt_word_num_to_predict = torch.sum(q_len[:, 1:]).item()  # omitting leading `SOS`
+            tgt_word_num_to_predict = torch.sum(q_len).item()
             cum_tgt_words += tgt_word_num_to_predict
 
             # Log info
             progress_bar.update(batch_size)
             progress_bar.set_postfix(NLL=nll_meter.avg)
 
+    print(cum_loss)
+    print(cum_tgt_words)
     ppl = np.exp(cum_loss / cum_tgt_words)
     results_list = [('NLL', nll_meter.avg),
                 ('PPL', ppl)]
