@@ -17,7 +17,7 @@ import util
 from args import get_train_args
 from collections import OrderedDict
 from json import dumps
-from models import BiDAF
+from models import Seq2Seq
 from tensorboardX import SummaryWriter
 from tqdm import tqdm
 from ujson import load as json_load
@@ -46,9 +46,10 @@ def main(args):
 
     # Get model
     log.info('Building model...')
-    model = BiDAF(word_vectors=word_vectors,
-                  hidden_size=args.hidden_size,
-                  drop_prob=args.drop_prob)
+    model = Seq2Seq(word_vectors=word_vectors,
+                    hidden_size=args.hidden_size,
+                    output_size=word_vectors.size(0),
+                    drop_prob=args.drop_prob)
     model = nn.DataParallel(model, args.gpu_ids)
     if args.load_path:
         log.info(f'Loading checkpoint from {args.load_path}...')
@@ -66,9 +67,15 @@ def main(args):
                                  maximize_metric=args.maximize_metric,
                                  log=log)
 
-    # Get optimizer and scheduler
-    optimizer = optim.Adadelta(model.parameters(), args.lr,
-                               weight_decay=args.l2_wd)
+    # Get optimizer and scheduler    
+    # Default project starter code uses Adadelta, but we're going to use Adam
+
+    #optimizer = optim.Adadelta(model.parameters(), args.lr,
+    #                           weight_decay=args.l2_wd)
+
+    optimizer = optim.Adam(model.parameters(), args.lr,
+                           weight_decay=args.l2_wd)
+                               
     scheduler = sched.LambdaLR(optimizer, lambda s: 1.)  # Constant LR
 
     # Get data loader
@@ -103,9 +110,11 @@ def main(args):
                 optimizer.zero_grad()
 
                 # Forward
-                log_p1, log_p2 = model(cw_idxs, qw_idxs)
-                y1, y2 = y1.to(device), y2.to(device)
-                loss = F.nll_loss(log_p1, y1) + F.nll_loss(log_p2, y2)
+                log_p = model(cw_idxs, qw_idxs)        #(batch_size, q_len, vocab_size)
+                
+                log_p = log_p.contiguous().view(log_p.size(0) * log_p.size(1), log_p.size(2))
+                qw_idxs = qw_idxs.contiguous().view(qw_idxs.size(0) * qw_idxs.size(1), qw_idxs.size(2))
+                loss = F.nll_loss(log_p, qw_idxs, reduction='sum')
                 loss_val = loss.item()
 
                 # Backward
@@ -132,10 +141,10 @@ def main(args):
                     # Evaluate and save checkpoint
                     log.info(f'Evaluating at step {step}...')
                     ema.assign(model)
-                    results, pred_dict = evaluate(model, dev_loader, device,
-                                                  args.dev_eval_file,
-                                                  args.max_ans_len,
-                                                  args.use_squad_v2)
+                    results = evaluate(model,
+                                       dev_loader,
+                                       device,
+                                       args.use_squad_v2)
                     saver.save(step, model, results[args.metric_name], device)
                     ema.resume(model)
 
@@ -143,65 +152,59 @@ def main(args):
                     results_str = ', '.join(f'{k}: {v:05.2f}' for k, v in results.items())
                     log.info(f'Dev {results_str}')
 
-                    # Log to TensorBoard
-                    log.info('Visualizing in TensorBoard...')
-                    for k, v in results.items():
-                        tbx.add_scalar(f'dev/{k}', v, step)
-                    util.visualize(tbx,
-                                   pred_dict=pred_dict,
-                                   eval_path=args.dev_eval_file,
-                                   step=step,
-                                   split='dev',
-                                   num_visuals=args.num_visuals)
 
-
-def evaluate(model, data_loader, device, eval_file, max_len, use_squad_v2):
+def evaluate(model, data_loader, device, use_squad_v2):
+    """ Evaluate on dev questions
+    @param model (Module): Question Generation Model
+    @param data_loader (DataLoader): DataLoader to load dev examples in batches
+    @param device (string): 'cuda:0' or 'cpu'
+    @param use_squad_v2 (bool): boolean flag to indicate whether to use SQuAD 2.0 
+    @returns results (dictionary of on dev questions)
+    """
     nll_meter = util.AverageMeter()
 
+    was_training = model.training
     model.eval()
-    pred_dict = {}
-    with open(eval_file, 'r') as fh:
-        gold_dict = json_load(fh)
-    with torch.no_grad(), \
-            tqdm(total=len(data_loader.dataset)) as progress_bar:
+
+    cum_loss = 0.
+    cum_tgt_words = 0.
+
+    # no_grad() signals backend to throw away all gradients
+    with torch.no_grad():
         for cw_idxs, cc_idxs, qw_idxs, qc_idxs, y1, y2, ids in data_loader:
             # Setup for forward
             cw_idxs = cw_idxs.to(device)
             qw_idxs = qw_idxs.to(device)
             batch_size = cw_idxs.size(0)
-
+            
             # Forward
-            log_p1, log_p2 = model(cw_idxs, qw_idxs)
-            y1, y2 = y1.to(device), y2.to(device)
-            loss = F.nll_loss(log_p1, y1) + F.nll_loss(log_p2, y2)
+            log_p = model(cw_idxs, qw_idxs)        #(batch_size, q_len, vocab_size)
+                
+            log_p = log_p.contiguous().view(log_p.size(0) * log_p.size(1), log_p.size(2))
+            qw_idxs = qw_idxs.contiguous().view(qw_idxs.size(0) * qw_idxs.size(1), qw_idxs.size(2))
+            loss = F.nll_loss(log_p, qw_idxs, reduction='sum')
             nll_meter.update(loss.item(), batch_size)
 
-            # Get F1 and EM scores
-            p1, p2 = log_p1.exp(), log_p2.exp()
-            starts, ends = util.discretize(p1, p2, max_len, use_squad_v2)
+            # Calculate perplexity
+            cum_loss += loss.item()
+            q_mask = torch.zeros_like(qw_idxs) != qw_idxs
+            q_len = q_mask.sum(-1)
+            tgt_word_num_to_predict = torch.sum(q_len[:, 1:]).item()  # omitting leading `SOS`
+            cum_tgt_words += tgt_word_num_to_predict
 
             # Log info
             progress_bar.update(batch_size)
             progress_bar.set_postfix(NLL=nll_meter.avg)
 
-            preds, _ = util.convert_tokens(gold_dict,
-                                           ids.tolist(),
-                                           starts.tolist(),
-                                           ends.tolist(),
-                                           use_squad_v2)
-            pred_dict.update(preds)
-
-    model.train()
-
-    results = util.eval_dicts(gold_dict, pred_dict, use_squad_v2)
+    ppl = np.exp(cum_loss / cum_tgt_words)
     results_list = [('NLL', nll_meter.avg),
-                    ('F1', results['F1']),
-                    ('EM', results['EM'])]
-    if use_squad_v2:
-        results_list.append(('AvNA', results['AvNA']))
+                ('PPL', ppl)]
     results = OrderedDict(results_list)
 
-    return results, pred_dict
+    if was_training:
+        model.train()
+
+    return results
 
 
 if __name__ == '__main__':

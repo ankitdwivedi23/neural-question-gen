@@ -26,8 +26,10 @@ class Seq2Seq(nn.Module):
         super(Seq2Seq, self).__init__()
         
         self.device = device
+
+        self.word_vectors = word_vectors
         
-        self.embedding = layers.Embedding(word_vectors=word_vectors,
+        self.emb = layers.Embedding(word_vectors=word_vectors,
                                     hidden_size=hidden_size,
                                     drop_prob=drop_prob)
 
@@ -67,3 +69,28 @@ class Seq2Seq(nn.Module):
         log_probs = util.masked_softmax(logits, q_mask, dim=-1, log_softmax=True)       #(batch_size, q_len, output_size)
         
         return log_probs
+
+    def step(self, qw_idx_t: torch.Tensor,
+            decoder_init_state: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+        """ Compute one forward step of the RNN decoder
+
+        @param qw_idx_t (Tensor): t_th word Index of question.
+                Shape (batch_size, 1).
+        @param decoder_init_state (Tensor): Decoder's prev hidden state
+                Shape (batch_size, hidden_size)
+
+        @returns dec_hidden (Tensor): Decoder's hidden state after passing q_t and previous hidden state
+                Shape (batch_size, hidden_size)
+        @returns log_probs (Tensor): Soft prediction for next word index
+                Shape ((batch_size, 1, output_size))
+        """
+
+        q_mask = torch.zeros_like(qw_idxs_t) != qw_idxs # (batch_size, 1)
+        q_t = self.emb(qw_idxs_t)   # (batch_size, 1, hidden_size)
+        decoder_hidden = dec_init_state     #(batch_size, hidden_size)
+
+        o_t, decoder_hidden = self.decoder(q_t, decoder_hidden)
+        logits = self.projection(o_t)   #(batch_size, 1, output_size)
+        log_probs = util.masked_softmax(logits, q_mask, dim=-1, log_softmax=True)    #(batch_size, 1, output_size)
+
+        return decoder_hidden, log_probs
