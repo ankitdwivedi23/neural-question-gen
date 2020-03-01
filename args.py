@@ -137,7 +137,7 @@ def get_train_args():
 
     args = parser.parse_args()
 
-    if args.metric_name == 'NLL':
+    if args.metric_name in ('NLL', 'PPL'):
         # Best checkpoint is the one that minimizes negative log-likelihood
         args.maximize_metric = False
     elif args.metric_name in ('EM', 'F1'):

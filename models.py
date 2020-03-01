@@ -20,14 +20,12 @@ class Seq2Seq(nn.Module):
         hidden_size (int): Number of features in the hidden state at each layer.
         output_size(int): Number of logits for softmax layer
         drop_prob (float): Dropout probability.
-        device (string): cuda or cpu
     """
-    def __init__(self, word_vectors, hidden_size, output_size, drop_prob=0., device='cpu'):
+    def __init__(self, word_vectors, hidden_size, output_size, drop_prob=0.):
         super(Seq2Seq, self).__init__()
-        
-        self.device = device
 
-        self.word_vectors = word_vectors
+        self.hidden_size = hidden_size
+        self.output_size = output_size
         
         self.emb = layers.Embedding(word_vectors=word_vectors,
                                     hidden_size=hidden_size,
@@ -48,7 +46,7 @@ class Seq2Seq(nn.Module):
         batch_size = cw_idxs.size(0)
         
         # Chop of the EOS token.
-        qw_idxs = qw_idxs[:-1]
+        qw_idxs = qw_idxs[:, :-1]
 
         c_mask = torch.zeros_like(cw_idxs) != cw_idxs
         q_mask = torch.zeros_like(qw_idxs) != qw_idxs
@@ -60,14 +58,25 @@ class Seq2Seq(nn.Module):
         c_enc, dec_init_state = self.encoder(c_emb, c_len)    # (batch_size, c_len, 2 * hidden_size)
         
         decoder_outputs = []
-        decoder_hidden = dec_init_state         #(batch_size, hidden_size)  
-        for q_t in torch.split(q_emb, split_size_or_sections=1, dim=1):         #(batch_size, 1, hidden_size)    
+        h_0, c_0 = dec_init_state        #(batch_size, hidden_size)
+        h_0 = h_0.contiguous().view(1, batch_size, self.hidden_size)
+        c_0 = c_0.contiguous().view(1, batch_size, self.hidden_size)
+        decoder_hidden = (h_0, c_0)
+
+        for q_t in torch.split(q_emb, split_size_or_sections=1, dim=1):         #(batch_size, 1, hidden_size)
             o_t, decoder_hidden = self.decoder(q_t, decoder_hidden)
             decoder_outputs.append(o_t)
-        decoder_outputs = torch.stack(decoder_outputs, dim=1)       #(batch_size, q_len, hidden_size)
-        logits = self.projection(decoder_outputs)                   #(batch_size, q_len, output_size)
-        log_probs = util.masked_softmax(logits, q_mask, dim=-1, log_softmax=True)       #(batch_size, q_len, output_size)
+    
+        decoder_outputs = torch.stack(decoder_outputs, dim=1).squeeze(dim=2)       #(batch_size, q_len, hidden_size)        
+        logits = self.projection(decoder_outputs)                   #(batch_size, q_len, output_size)        
         
+        # Mask not needed, as we can simply ignore pad tokens in the loss function
+        #q_mask.unsqueeze_(-1)
+        #q_mask = q_mask.expand(logits.size(0), logits.size(1), logits.size(2))        
+        #log_probs = util.masked_softmax(logits, q_mask, dim=-1, log_softmax=True)       #(batch_size, q_len, output_size)
+        
+        log_probs = F.log_softmax(logits, dim=-1)        #(batch_size, q_len, output_size)
+
         return log_probs
 
     def step(self, qw_idx_t: torch.Tensor,
