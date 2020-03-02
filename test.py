@@ -68,7 +68,7 @@ def main(args):
 
             # Forward
             y = nn.functional.one_hot(qw_idxs, num_classes=len(word_vectors))
-            hypotheses = util.beamSearch(model, cw_idxs, qw_idxs)
+            hypotheses = util.beamSearch(model, cw_idxs, qw_idxs, device)
             loss = 0.
             pred_dict[cw_idxs] = []
 
