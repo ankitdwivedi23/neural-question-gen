@@ -116,7 +116,7 @@ def main(args):
                 log_p = log_p.contiguous().view(log_p.size(0) * log_p.size(1), log_p.size(2))
                 qw_idxs_target = qw_idxs[:, 1:]     # omitting leading `SOS`
                 qw_idxs_target = qw_idxs_target.contiguous().view(qw_idxs_target.size(0) * qw_idxs_target.size(1))
-                loss = F.nll_loss(log_p, qw_idxs_target, ignore_index=0, reduction='sum')
+                loss = F.nll_loss(log_p, qw_idxs_target, ignore_index=0)
                 loss_val = loss.item()
 
                 # Backward
@@ -186,7 +186,7 @@ def evaluate(model, data_loader, device, use_squad_v2):
             log_p = log_p.contiguous().view(log_p.size(0) * log_p.size(1), log_p.size(2))
             qw_idxs_target = qw_idxs[:, 1:]     # omitting leading `SOS`
             qw_idxs_target = qw_idxs_target.contiguous().view(qw_idxs_target.size(0) * qw_idxs_target.size(1))
-            loss = F.nll_loss(log_p, qw_idxs_target, ignore_index=0, reduction='sum')
+            loss = F.nll_loss(log_p, qw_idxs_target, ignore_index=0)
             nll_meter.update(loss.item(), batch_size)
 
             # Calculate perplexity
