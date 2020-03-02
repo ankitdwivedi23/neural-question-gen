@@ -1,16 +1,3 @@
-"""Test a model and generate submission CSV.
-
-Usage:
-    > python test.py --split SPLIT --load_path PATH --name NAME
-    where
-    > SPLIT is either "dev" or "test"
-    > PATH is a path to a checkpoint (e.g., save/train/model-01/best.pth.tar)
-    > NAME is a name to identify the test run
-
-Author:
-    Chris Chute (chute@stanford.edu)
-"""
-
 import csv
 import torch
 import torch.nn as nn
@@ -21,7 +8,7 @@ import util
 from args import get_test_args
 from collections import OrderedDict
 from json import dumps
-from models import BiDAF
+from models import Seq2Seq
 from os.path import join
 from tensorboardX import SummaryWriter
 from tqdm import tqdm
@@ -81,11 +68,11 @@ def main(args):
 
             # Forward
             y = nn.functional.one_hot(qw_idxs, num_classes=len(word_vectors))
-            hypotheses = util.beamSearch(model, cw_idxs, qw_idxs)
+            hypotheses = util.beamSearch(model, cw_idxs, qw_idxs, device)
             loss = 0.
             pred_dict[cw_idxs] = []
 
-            for hyp in hypotheses
+            for hyp in hypotheses:
                 loss = loss + hyp.score
                 pred_dict[cw_idxs].append(hyp.value)
             nll_meter.update(loss, batch_size)
