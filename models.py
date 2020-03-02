@@ -28,6 +28,8 @@ class Seq2Seq(nn.Module):
 
         self.hidden_size = hidden_size
         self.output_size = output_size
+
+        self.word_vectors = word_vectors
         
         self.emb = layers.Embedding(word_vectors=word_vectors,
                                     hidden_size=hidden_size,
@@ -96,12 +98,11 @@ class Seq2Seq(nn.Module):
                 Shape ((batch_size, 1, output_size))
         """
 
-        q_mask = torch.zeros_like(qw_idxs_t) != qw_idxs # (batch_size, 1)
         q_t = self.emb(qw_idxs_t)   # (batch_size, 1, hidden_size)
         decoder_hidden = dec_init_state     #(batch_size, hidden_size)
 
         o_t, decoder_hidden = self.decoder(q_t, decoder_hidden)
         logits = self.projection(o_t)   #(batch_size, 1, output_size)
-        log_probs = util.masked_softmax(logits, q_mask, dim=-1, log_softmax=True)    #(batch_size, 1, output_size)
+        log_probs = F.log_softmax(logits)    #(batch_size, 1, output_size)
 
         return decoder_hidden, log_probs
