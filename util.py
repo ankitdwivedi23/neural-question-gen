@@ -14,7 +14,9 @@ import numpy as np
 import ujson as json
 
 from collections import Counter
+from collections import namedtuple
 Hypothesis = namedtuple('Hypothesis', ['value', 'score'])
+from typing import List, Tuple, Dict, Set, Union
 
 class SQuAD(data.Dataset):
     """Stanford Question Answering Dataset (SQuAD).
