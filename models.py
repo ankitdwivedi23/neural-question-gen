@@ -8,6 +8,8 @@ import torch.nn.functional as F
 import layers
 import util
 
+from typing import List, Tuple, Dict, Set, Union
+
 class Seq2Seq(nn.Module):
     """Baseline seq2seq model
     Implements a basic seq2seq network (without attention):
