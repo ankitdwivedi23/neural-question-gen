@@ -156,10 +156,10 @@ def main(args):
 
                     # Evaluate and save checkpoint
                     log.info(f'Evaluating at step {step}...')
-                    print(getWords(cw_idx.squeeze().tolist()))
-                    print(getWords(qw_idx.squeeze().tolist()))
-                    util.TeacherForce(model, word2Idx, Idx2Word, cw_idx, qw_idx, device)
-                    util.evaluateRandomly(model, word2Idx, Idx2Word, cw_idx, device)
+                    print(getWords(cw_idxs.squeeze().tolist()))
+                    print(getWords(qw_idxs.squeeze().tolist()))
+                    util.TeacherForce(model, word2Idx, Idx2Word, cw_idxs, qw_idxs, device)
+                    util.evaluateRandomly(model, word2Idx, Idx2Word, cw_idxs, device)
 
                     ema.assign(model)
                     results = evaluate(model,
