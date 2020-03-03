@@ -34,7 +34,13 @@ def main(args):
     log.info('Loading word2Idx...')
     word2Idx = json.loads(open(args.word2idx_file).read())
     Idx2Word = {v: k for (k,v) in word2Idx.items()}
-    
+
+    def getWords(idxList):
+        words = []
+        for i in idxList:
+            words.append(Idx2Word[i])
+        return words
+
     # Get model
     log.info('Building model...')
     model = Seq2Seq(word_vectors=word_vectors,
@@ -74,7 +80,9 @@ def main(args):
             # Forward
             for cw_idx, qw_idx in zip(torch.split(cw_idxs, split_size_or_sections=1, dim=0), torch.split(qw_idxs, split_size_or_sections=1, dim=0)):
                 #y = F.one_hot(qw_idx, num_classes=len(word_vectors))
-                hypotheses = util.beamSearch(model, word2Idx, Idx2Word, cw_idx, qw_idx, device)
+                print(getWords(cw_idx.squeeze().tolist()))
+                util.evaluateRandomly(model, word2Idx, Idx2Word, cw_idx, qw_idx, device)
+                hypotheses = util.beamSearch(model, word2Idx, Idx2Word, cw_idx, device)
                 loss = 0.
                 pred_dict[cw_idx] = []
 

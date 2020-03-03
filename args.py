@@ -231,7 +231,7 @@ def add_train_test_args(parser):
                               multiple GPUs are available.')
     parser.add_argument('--use_squad_v2',
                         type=lambda s: s.lower().startswith('t'),
-                        default=True,
+                        default=False,
                         help='Whether to use SQuAD 2.0 (unanswerable) questions.')
     parser.add_argument('--hidden_size',
                         type=int,
