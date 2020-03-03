@@ -81,7 +81,8 @@ def main(args):
             for cw_idx, qw_idx in zip(torch.split(cw_idxs, split_size_or_sections=1, dim=0), torch.split(qw_idxs, split_size_or_sections=1, dim=0)):
                 #y = F.one_hot(qw_idx, num_classes=len(word_vectors))
                 print(getWords(cw_idx.squeeze().tolist()))
-                util.evaluateRandomly(model, word2Idx, Idx2Word, cw_idx, qw_idx, device)
+                util.TeacherForce(model, word2Idx, Idx2Word, cw_idx, qw_idx, device)
+                util.evaluateRandomly(model, word2Idx, Idx2Word, cw_idx, device)
                 hypotheses = util.beamSearch(model, word2Idx, Idx2Word, cw_idx, device)
                 loss = 0.
                 pred_dict[cw_idx] = []
