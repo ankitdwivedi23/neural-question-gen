@@ -548,26 +548,30 @@ def torch_from_json(path, dtype=torch.float32):
 def evaluateRandomly(model, word2idx_dict, idx2word_dict, cw_idx, qw_idx, device):
     SOS = "--SOS--"
     EOS = "--EOS--"
+    max_len = 10
 
+    q = qw_idx.squeeze().tolist()
     c_mask = torch.zeros_like(cw_idx) != cw_idx
     c_len = c_mask.sum(-1)
     c_emb = model.module.emb(cw_idx)      
     c_enc, dec_init_state = model.module.encoder(c_emb, c_len)   
-    prev_word = "SOS"
-    h_t = dec_init_state[0].unsqueeze(1), dec_init_state[1].unsqueeze(1)
+    prev_word = SOS
+    h_t = dec_init_state[0].unsqueeze(0), dec_init_state[1].unsqueeze(0)
 
-    while prev_word != EOS:
-        print(prev_word)
-        wait = input("Sab chill hai.. press to continue")
+    t = 0
+    sent = []
+
+    while prev_word != EOS and t < max_len:
+        sent.append(prev_word)
         eos_id = word2idx_dict[EOS] 
-        y_tm1 = torch.tensor([[word2idx_dict[prev_word]]], dtype=torch.long, device=device)
-        print(h_t)
+        y_tm1 = torch.tensor([[q[t]]], dtype=torch.long, device=device)
         h_t, log_p_t  = model.module.step(y_tm1, h_t)
-        print(h_t)
         prev_word = idx2word_dict[log_p_t.argmax(-1).squeeze().tolist()]
-    
+        t = t+1
 
-def beamSearch(model, word2idx_dict, idx2word_dict, cw_idx, device, beam_size: int=5, max_decoding_time_step: int=300)-> List[Hypothesis]:
+    print(sent)
+
+def beamSearch(model, word2idx_dict, idx2word_dict, cw_idx, device, beam_size: int=5, max_decoding_time_step: int=70)-> List[Hypothesis]:
     """Discretize soft predictions to get question text.
 
     Args:
@@ -593,7 +597,7 @@ def beamSearch(model, word2idx_dict, idx2word_dict, cw_idx, device, beam_size: i
     c_emb = model.module.emb(cw_idx)         # (1, c_len, hidden_size)
     c_enc, dec_init_state = model.module.encoder(c_emb, c_len)    # (1, c_len, 2 * hidden_size)
 
-    h_tm1 = dec_init_state
+    h_tm1 = dec_init_state[0].unsqueeze(0), dec_init_state[1].unsqueeze(0)
     eos_id = word2idx_dict[EOS] 
     vocab_size = len(model.module.word_vectors)
 
@@ -611,7 +615,7 @@ def beamSearch(model, word2idx_dict, idx2word_dict, cw_idx, device, beam_size: i
         # (batch_size, 1)
         y_tm1 = torch.tensor([word2idx_dict[hyp[-1]] for hyp in hypotheses], dtype=torch.long, device=device)
         h_t, log_p_t  = model.module.step(y_tm1.unsqueeze(1), h_tm1)
-        h_t = h_t[0].squeeze(0), h_t[0].squeeze(0)   # Assuming layer dimension is 1
+        h_t = h_t[0].permute(1,0,2), h_t[0].permute(1,0,2)  
 
         live_hyp_num = beam_size - len(completed_hypotheses)
         contiuating_hyp_scores = (hyp_scores.unsqueeze(1).unsqueeze(2).expand_as(log_p_t) + log_p_t).contiguous().view(-1)
@@ -643,7 +647,7 @@ def beamSearch(model, word2idx_dict, idx2word_dict, cw_idx, device, beam_size: i
             break
 
         live_hyp_ids = torch.tensor(live_hyp_ids, dtype=torch.long, device=device)
-        h_tm1 = h_t[0][live_hyp_ids], h_t[1][live_hyp_ids]   
+        h_tm1 = h_t[0][live_hyp_ids].permute(1,0,2), h_t[1][live_hyp_ids].permute(1,0,2)
         hypotheses = new_hypotheses
         hyp_scores = torch.tensor(new_hyp_scores, dtype=torch.float, device=device)
 
