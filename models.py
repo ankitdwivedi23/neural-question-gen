@@ -89,8 +89,8 @@ class Seq2Seq(nn.Module):
 
         @param qw_idx_t (Tensor): t_th word Index of question.
                 Shape (batch_size, 1).
-        @param decoder_init_state (Tensor): Decoder's prev hidden state
-                Shape (batch_size, hidden_size)
+        @param decoder_init_state (Tuple(Tensor)): Decoder's prev hidden state
+                Shape (batch_size, 1, hidden_size)
 
         @returns dec_hidden (Tensor): Decoder's hidden state after passing q_t and previous hidden state
                 Shape (batch_size, hidden_size)
@@ -100,10 +100,9 @@ class Seq2Seq(nn.Module):
 
         q_t = self.emb(qw_idx_t)   # (batch_size, 1, hidden_size)
         h_0, c_0 = decoder_init_state #(batch_size, hidden_size)
-        decoder_hidden =  h_0.unsqueeze(0), c_0.unsqueeze(0) #(1, batch_size, hidden_size)    
+        decoder_hidden =  h_0, c_0 #(batch_size, 1, hidden_size)    
 
         o_t, decoder_hidden = self.decoder(q_t, decoder_hidden)
         logits = self.projection(o_t)   #(batch_size, 1, output_size)
         log_probs = F.log_softmax(logits, dim=2)    #(batch_size, 1, output_size)
-
         return decoder_hidden, log_probs
