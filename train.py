@@ -158,8 +158,8 @@ def main(args):
                     log.info(f'Evaluating at step {step}...')
                     print(getWords(cw_idxs[batch_size-1].squeeze().tolist()))
                     print(getWords(qw_idxs[batch_size-1].squeeze().tolist()))
-                    util.TeacherForce(model, word2Idx, Idx2Word, cw_idxs, qw_idxs, device)
-                    util.evaluateRandomly(model, word2Idx, Idx2Word, cw_idxs, device)
+                    util.TeacherForce(model, word2Idx, Idx2Word, cw_idxs[batch_size-1], qw_idxs[batch_size-1], device)
+                    util.evaluateRandomly(model, word2Idx, Idx2Word, cw_idxs[batch_size-1], device)
 
                     ema.assign(model)
                     results = evaluate(model,
