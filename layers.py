@@ -147,11 +147,3 @@ class DecoderRNN(nn.Module):
         self.rnn.flatten_parameters()
         output, hidden = self.rnn(input, hidden)
         return output, hidden
-
-        
-
-
-
-
-
-
