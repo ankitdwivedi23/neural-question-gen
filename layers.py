@@ -24,7 +24,7 @@ class Embedding(nn.Module):
         super(Embedding, self).__init__()
         self.drop_prob = drop_prob
         self.embed = nn.Embedding.from_pretrained(word_vectors)
-        self.proj = nn.Linear(word_vectors.size(1), hidden_size, bias=True)
+        self.proj = nn.Linear(word_vectors.size(1), hidden_size, bias=False)
         self.hwy = HighwayEncoder(2, hidden_size)
 
     def forward(self, x):
@@ -89,8 +89,8 @@ class EncoderRNN(nn.Module):
                            bidirectional=True,
                            dropout=drop_prob if num_layers > 1 else 0.)
         
-        self.h_projection = nn.Linear(in_features=2*hidden_size, out_features=hidden_size, bias=True)
-        self.c_projection = nn.Linear(in_features=2*hidden_size, out_features=hidden_size, bias=True)
+        self.h_projection = nn.Linear(in_features=2*hidden_size, out_features=hidden_size, bias=False)
+        self.c_projection = nn.Linear(in_features=2*hidden_size, out_features=hidden_size, bias=False)
 
     def forward(self, x, lengths):
         # Save original padded length for use by pad_packed_sequence

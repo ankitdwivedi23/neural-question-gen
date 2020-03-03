@@ -120,7 +120,6 @@ def main(args):
                 loss_batch = F.nll_loss(log_p, qw_idxs_target, ignore_index=0, reduction='sum')
                 loss = loss_batch / batch_size
                 loss_val = loss.item()
-                ppl = np.exp(loss_batch.item() / tgt_word_num_to_predict)
 
                 # Backward
                 loss.backward()
@@ -145,11 +144,6 @@ def main(args):
 
                     # Evaluate and save checkpoint
                     log.info(f'Evaluating at step {step}...')
-                    
-                    # Temp logging
-                    log.info(f'train loss = {loss_val}')
-                    log.info(f'number of words in training batch = {tgt_word_num_to_predict}')
-                    log.info(f'train PPL = {ppl}')
 
                     ema.assign(model)
                     results = evaluate(model,
@@ -209,7 +203,7 @@ def evaluate(model, data_loader, device, use_squad_v2):
             progress_bar.update(batch_size)
             progress_bar.set_postfix(NLL=nll_meter.avg)
 
-    ppl = np.exp(cum_loss / cum_tgt_words)
+        ppl = np.exp(cum_loss / cum_tgt_words)
 
     results_list = [('NLL', nll_meter.avg), \
                 ('PPL', ppl)]
