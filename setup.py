@@ -146,6 +146,11 @@ def process_file(filename, data_type, word_counter, char_counter):
                                                  "spans": spans,
                                                  "answers": answer_texts,
                                                  "uuid": qa["id"]}
+            if (data_type == 'train' and total >=500) or \
+            (data_type == 'dev' and total >=50) or \
+            (data_type == 'test' and total >=50):
+                break
+
         print(f"{len(examples)} questions in total")
     return examples, eval_examples
 
@@ -389,7 +394,7 @@ if __name__ == '__main__':
     args_ = get_setup_args()
 
     # Download resources
-    download(args_)
+    #download(args_)
 
     # Import spacy language model
     nlp = spacy.blank("en")
