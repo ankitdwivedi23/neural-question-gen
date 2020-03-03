@@ -156,7 +156,7 @@ def main(args):
 
                     # Evaluate and save checkpoint
                     log.info(f'Evaluating at step {step}...')
-                    print(getWords(cw_idxs.squeeze().tolist()))
+                    print(getWords(cw_idxs[batch_size-1].squeeze().tolist()))
                     print(getWords(qw_idxs.squeeze().tolist()))
                     util.TeacherForce(model, word2Idx, Idx2Word, cw_idxs, qw_idxs, device)
                     util.evaluateRandomly(model, word2Idx, Idx2Word, cw_idxs, device)
