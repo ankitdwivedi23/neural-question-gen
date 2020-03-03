@@ -23,7 +23,6 @@ from tqdm import tqdm
 from ujson import load as json_load
 from util import collate_fn, SQuAD
 
-
 def main(args):
     # Set up logging and devices
     args.save_dir = util.get_save_dir(args.save_dir, args.name, training=True)
@@ -115,8 +114,13 @@ def main(args):
                 log_p = log_p.contiguous().view(log_p.size(0) * log_p.size(1), log_p.size(2))
                 qw_idxs_target = qw_idxs[:, 1:]     # omitting leading `SOS`
                 qw_idxs_target = qw_idxs_target.contiguous().view(qw_idxs_target.size(0) * qw_idxs_target.size(1))
-                loss = F.nll_loss(log_p, qw_idxs_target, ignore_index=0)
+                q_mask = torch.zeros_like(qw_idxs_target) != qw_idxs_target
+                q_len = q_mask.sum(-1)
+                tgt_word_num_to_predict = torch.sum(q_len).item()
+                loss_batch = F.nll_loss(log_p, qw_idxs_target, ignore_index=0, reduction='sum')
+                loss = loss_batch / batch_size
                 loss_val = loss.item()
+                ppl = np.exp(loss_batch.item() / tgt_word_num_to_predict)
 
                 # Backward
                 loss.backward()
@@ -141,6 +145,12 @@ def main(args):
 
                     # Evaluate and save checkpoint
                     log.info(f'Evaluating at step {step}...')
+                    
+                    # Temp logging
+                    log.info(f'train loss = {loss_val}')
+                    log.info(f'number of words in training batch = {tgt_word_num_to_predict}')
+                    log.info(f'train PPL = {ppl}')
+
                     ema.assign(model)
                     results = evaluate(model,
                                        dev_loader,
@@ -185,10 +195,10 @@ def evaluate(model, data_loader, device, use_squad_v2):
             log_p = log_p.contiguous().view(log_p.size(0) * log_p.size(1), log_p.size(2))
             qw_idxs_target = qw_idxs[:, 1:]     # omitting leading `SOS`
             qw_idxs_target = qw_idxs_target.contiguous().view(qw_idxs_target.size(0) * qw_idxs_target.size(1))
-            loss = F.nll_loss(log_p, qw_idxs_target, ignore_index=0)
+            loss = F.nll_loss(log_p, qw_idxs_target, ignore_index=0, reduction='sum')
             nll_meter.update(loss.item(), batch_size)
 
-            # Calculate perplexity
+            # Calculate perplexity        
             cum_loss += loss.item()
             q_mask = torch.zeros_like(qw_idxs_target) != qw_idxs_target
             q_len = q_mask.sum(-1)
@@ -199,10 +209,9 @@ def evaluate(model, data_loader, device, use_squad_v2):
             progress_bar.update(batch_size)
             progress_bar.set_postfix(NLL=nll_meter.avg)
 
-    print(cum_loss)
-    print(cum_tgt_words)
     ppl = np.exp(cum_loss / cum_tgt_words)
-    results_list = [('NLL', nll_meter.avg),
+
+    results_list = [('NLL', nll_meter.avg), \
                 ('PPL', ppl)]
     results = OrderedDict(results_list)
 
