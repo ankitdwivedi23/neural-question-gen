@@ -90,6 +90,7 @@ def main(args):
                     loss = loss + hyp.score
                     pred_dict[cw_idx].append(hyp.value)
                 nll_meter.update(loss, batch_size)
+                wait = input("Sab chill hai.. press to continue")
             # Log info
             progress_bar.update(batch_size)
             if args.split != 'test':
