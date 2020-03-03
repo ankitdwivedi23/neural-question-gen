@@ -4,6 +4,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.utils.data as data
 import util
+import json
 
 from args import get_test_args
 from collections import OrderedDict
@@ -28,6 +29,10 @@ def main(args):
     # Get embeddings
     log.info('Loading embeddings...')
     word_vectors = util.torch_from_json(args.word_emb_file)
+
+    #Load Word2Idx
+    log.info('Loading word2Idx...')
+    word2Idx = json.loads(open(args.word2idx_file).read())
 
     
     # Get model
@@ -67,15 +72,16 @@ def main(args):
             batch_size = cw_idxs.size(0)
 
             # Forward
-            y = nn.functional.one_hot(qw_idxs, num_classes=len(word_vectors))
-            hypotheses = util.beamSearch(model, cw_idxs, qw_idxs, device)
-            loss = 0.
-            pred_dict[cw_idxs] = []
+            for cw_idx, qw_idx in zip(torch.split(cw_idxs, split_size_or_sections=1, dim=0), torch.split(qw_idxs, split_size_or_sections=1, dim=0)):
+                y = nn.functional.one_hot(qw_idx, num_classes=len(word_vectors))
+                hypotheses = util.beamSearch(model, word2Idx, cw_idx, qw_idx, device)
+                loss = 0.
+                pred_dict[cw_idx] = []
 
-            for hyp in hypotheses:
-                loss = loss + hyp.score
-                pred_dict[cw_idxs].append(hyp.value)
-            nll_meter.update(loss, batch_size)
+                for hyp in hypotheses:
+                    loss = loss + hyp.score
+                    pred_dict[cw_idx].append(hyp.value)
+                nll_meter.update(loss, batch_size)
             # Log info
             progress_bar.update(batch_size)
             if args.split != 'test':

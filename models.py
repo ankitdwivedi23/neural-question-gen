@@ -98,8 +98,9 @@ class Seq2Seq(nn.Module):
                 Shape ((batch_size, 1, output_size))
         """
 
-        q_t = self.emb(qw_idxs_t)   # (batch_size, 1, hidden_size)
-        decoder_hidden = dec_init_state     #(batch_size, hidden_size)
+        q_t = self.emb(qw_idx_t)   # (batch_size, 1, hidden_size)
+        h_0, c_0 = decoder_init_state #(batch_size, hidden_size)
+        decoder_hidden =  h_0.unsqueeze(0), c_0.unsqueeze(0) #(1, batch_size, hidden_size)    
 
         o_t, decoder_hidden = self.decoder(q_t, decoder_hidden)
         logits = self.projection(o_t)   #(batch_size, 1, output_size)

@@ -545,15 +545,16 @@ def torch_from_json(path, dtype=torch.float32):
 
     return tensor
 
-def beamSearch(model, cw_idxs, qw_idxs, device, beam_size: int=3, max_decoding_time_step: int=70)-> List[Hypothesis]:
+def beamSearch(model, word2idx_dict, cw_idxs, qw_idxs, device, beam_size: int=3, max_decoding_time_step: int=70)-> List[Hypothesis]:
     """Discretize soft predictions to get question text.
 
     Args:
         model: NN Model
+        word2idx_dict: 
         cw_idxs (torch.Tensor): context word Index 
-            Shape (batch_size, c_len)
+            Shape (1, c_len)
         qw_idxs (torch.Tensor): Target question word Index 
-            Shape (batch_size, q_len)
+            Shape (1, q_len)
         device : 
         beam_size (Int): size of beam
         max_decoding_time_step (Int): maximum number of time steps to unroll the decoding RNN
@@ -568,8 +569,8 @@ def beamSearch(model, cw_idxs, qw_idxs, device, beam_size: int=3, max_decoding_t
 
     c_mask = torch.zeros_like(cw_idxs) != cw_idxs
     c_len = c_mask.sum(-1)
-    c_emb = model.module.emb(cw_idxs)         # (batch_size, c_len, hidden_size)
-    c_enc, dec_init_state = model.module.encoder(c_emb, c_len)    # (batch_size, c_len, 2 * hidden_size)
+    c_emb = model.module.emb(cw_idxs)         # (1, c_len, hidden_size)
+    c_enc, dec_init_state = model.module.encoder(c_emb, c_len)    # (1, c_len, 2 * hidden_size)
 
     h_tm1 = dec_init_state
     eos_id = 3 # HARD CODING!!!
@@ -589,7 +590,7 @@ def beamSearch(model, cw_idxs, qw_idxs, device, beam_size: int=3, max_decoding_t
         # (batch_size, 1)
         y_tm1 = torch.tensor([word2idx_dict[hyp[-1]] for hyp in hypotheses], dtype=torch.long, device=device)
         
-        h_t, log_p_t  = model.module.step(y_tm1, h_tm1)
+        h_t, log_p_t  = model.module.step(y_tm1.unsqueeze(0), h_tm1)
 
         live_hyp_num = beam_size - len(completed_hypotheses)
         contiuating_hyp_scores = (hyp_scores.unsqueeze(1).expand_as(log_p_t) + log_p_t).contiguous().view(-1)
@@ -621,7 +622,7 @@ def beamSearch(model, cw_idxs, qw_idxs, device, beam_size: int=3, max_decoding_t
             break
 
         live_hyp_ids = torch.tensor(live_hyp_ids, dtype=torch.long, device=device)
-        h_tm1 = h_t[live_hyp_ids]
+        h_tm1 = h_t[live_hyp_ids]  # BUGGGG! Bugs not debugged from here
 
         hypotheses = new_hypotheses
         hyp_scores = torch.tensor(new_hyp_scores, dtype=torch.float, device=device)
