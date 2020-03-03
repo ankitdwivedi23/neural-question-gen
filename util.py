@@ -545,12 +545,13 @@ def torch_from_json(path, dtype=torch.float32):
 
     return tensor
 
-def beamSearch(model, word2idx_dict, cw_idxs, qw_idxs, device, beam_size: int=3, max_decoding_time_step: int=70)-> List[Hypothesis]:
+def beamSearch(model, word2idx_dict, idx2word_dict, cw_idxs, qw_idxs, device, beam_size: int=3, max_decoding_time_step: int=70)-> List[Hypothesis]:
     """Discretize soft predictions to get question text.
 
     Args:
         model: NN Model
         word2idx_dict: 
+        idx2word_dict:
         cw_idxs (torch.Tensor): context word Index 
             Shape (1, c_len)
         qw_idxs (torch.Tensor): Target question word Index 
@@ -582,6 +583,8 @@ def beamSearch(model, word2idx_dict, cw_idxs, qw_idxs, device, beam_size: int=3,
 
     t = 0
     while len(completed_hypotheses) < beam_size and t < max_decoding_time_step:
+        #print("Iteration : " + str(t))
+        #print(h_tm1[0].size(), h_tm1[0].size())
         t += 1
         hyp_num = len(hypotheses)
 
@@ -591,6 +594,8 @@ def beamSearch(model, word2idx_dict, cw_idxs, qw_idxs, device, beam_size: int=3,
         y_tm1 = torch.tensor([word2idx_dict[hyp[-1]] for hyp in hypotheses], dtype=torch.long, device=device)
         
         h_t, log_p_t  = model.module.step(y_tm1.unsqueeze(0), h_tm1)
+        h_t = h_t[0].squeeze(0), h_t[0].squeeze(0)   # Assuming layer dimension is 1
+        #print(h_t[0].size(), h_t[1].size())
 
         live_hyp_num = beam_size - len(completed_hypotheses)
         contiuating_hyp_scores = (hyp_scores.unsqueeze(1).expand_as(log_p_t) + log_p_t).contiguous().view(-1)
@@ -608,7 +613,8 @@ def beamSearch(model, word2idx_dict, cw_idxs, qw_idxs, device, beam_size: int=3,
             hyp_word_id = hyp_word_id.item()
             cand_new_hyp_score = cand_new_hyp_score.item()
 
-            hyp_word = str(hyp_word_id) # Have to add idx2Word somehow self.vocab.tgt.id2word[hyp_word_id]
+            hyp_word = idx2word_dict[hyp_word_id] 
+            print(hyp_word)
             new_hyp_sent = hypotheses[prev_hyp_id] + [hyp_word]
             if hyp_word_id == eos_id:
                 completed_hypotheses.append(Hypothesis(value=new_hyp_sent[1:-1],
@@ -622,8 +628,9 @@ def beamSearch(model, word2idx_dict, cw_idxs, qw_idxs, device, beam_size: int=3,
             break
 
         live_hyp_ids = torch.tensor(live_hyp_ids, dtype=torch.long, device=device)
-        h_tm1 = h_t[live_hyp_ids]  # BUGGGG! Bugs not debugged from here
-
+        #print(live_hyp_ids)
+        h_tm1 = h_t[0][live_hyp_ids], h_t[1][live_hyp_ids]   # BUGGGG! Bugs not debugged from here
+        #print(h_tm1[0].size(), h_tm1[0].size())
         hypotheses = new_hypotheses
         hyp_scores = torch.tensor(new_hyp_scores, dtype=torch.float, device=device)
 
@@ -633,7 +640,7 @@ def beamSearch(model, word2idx_dict, cw_idxs, qw_idxs, device, beam_size: int=3,
 
     completed_hypotheses.sort(key=lambda hyp: hyp.score, reverse=True)
 
-    return hypotheses
+    return completed_hypotheses
 
 
 def convert_tokens(eval_dict, qa_id, y_start_list, y_end_list, no_answer):
