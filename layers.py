@@ -144,6 +144,7 @@ class DecoderRNN(nn.Module):
         self.rnn = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True)
 
     def forward(self, input, hidden):
+        output = F.relu(input)
         self.rnn.flatten_parameters()
         output, hidden = self.rnn(input, hidden)
         return output, hidden

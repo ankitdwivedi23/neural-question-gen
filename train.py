@@ -13,6 +13,7 @@ import torch.optim as optim
 import torch.optim.lr_scheduler as sched
 import torch.utils.data as data
 import util
+import json
 
 from args import get_train_args
 from collections import OrderedDict
@@ -43,9 +44,14 @@ def main(args):
     log.info('Loading embeddings...')
     word_vectors = util.torch_from_json(args.word_emb_file)
 
+    log.info('Loading word2Idx...')
+    word2Idx = json.loads(open(args.word2idx_file).read())
+    vocab_size = len(word2Idx)
+
     # Get model
     log.info('Building model...')
     model = Seq2Seq(word_vectors=word_vectors,
+                    vocab_size=vocab_size,
                     hidden_size=args.hidden_size,
                     output_size=word_vectors.size(0),
                     drop_prob=args.drop_prob)

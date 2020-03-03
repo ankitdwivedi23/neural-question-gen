@@ -23,7 +23,7 @@ class Seq2Seq(nn.Module):
         output_size(int): Number of logits for softmax layer
         drop_prob (float): Dropout probability.
     """
-    def __init__(self, word_vectors, hidden_size, output_size, drop_prob=0.):
+    def __init__(self, word_vectors, vocab_size, hidden_size, output_size, drop_prob=0.):
         super(Seq2Seq, self).__init__()
 
         self.hidden_size = hidden_size
@@ -31,10 +31,11 @@ class Seq2Seq(nn.Module):
 
         self.word_vectors = word_vectors
         
-        self.emb = layers.Embedding(word_vectors=word_vectors,
-                                    hidden_size=hidden_size,
-                                    drop_prob=drop_prob)
+        #self.emb = layers.Embedding(word_vectors=word_vectors,
+        #                            hidden_size=hidden_size,
+        #                            drop_prob=drop_prob)
 
+        self.emb = nn.Embedding(num_embeddings=vocab_size, embedding_dim=hidden_size)
         self.encoder = layers.EncoderRNN(input_size=hidden_size,
                                      hidden_size=hidden_size,
                                      num_layers=1,

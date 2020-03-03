@@ -134,6 +134,9 @@ def get_train_args():
                         type=float,
                         default=0.999,
                         help='Decay rate for exponential moving average of parameters.')
+    parser.add_argument('--word2idx_file',
+                        type=str,
+                        default='./data/minisample/word2idx.json')
 
     args = parser.parse_args()
 
