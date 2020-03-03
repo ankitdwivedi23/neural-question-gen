@@ -63,8 +63,8 @@ class Seq2Seq(nn.Module):
         
         decoder_outputs = []
         h_0, c_0 = dec_init_state        #(batch_size, hidden_size)
-        h_0 = h_0.contiguous().view(batch_size, 1, self.hidden_size)  # Assuming layer dimension is 1
-        c_0 = c_0.contiguous().view(batch_size, 1, self.hidden_size)  # Assuming layer dimension is 1
+        h_0 = h_0.contiguous().view(1, batch_size, self.hidden_size)  # Assuming layer dimension is 1
+        c_0 = c_0.contiguous().view(1, batch_size, self.hidden_size)  # Assuming layer dimension is 1
         decoder_hidden = (h_0, c_0)  
 
         for q_t in torch.split(q_emb, split_size_or_sections=1, dim=1):         #(batch_size, 1, hidden_size)
