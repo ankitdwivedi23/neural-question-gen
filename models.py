@@ -63,9 +63,9 @@ class Seq2Seq(nn.Module):
         
         decoder_outputs = []
         h_0, c_0 = dec_init_state        #(batch_size, hidden_size)
-        h_0 = h_0.contiguous().view(1, batch_size, self.hidden_size)
-        c_0 = c_0.contiguous().view(1, batch_size, self.hidden_size)
-        decoder_hidden = (h_0, c_0)
+        h_0 = h_0.contiguous().view(1, batch_size, self.hidden_size)  # Assuming layer dimension is 1
+        c_0 = c_0.contiguous().view(1, batch_size, self.hidden_size)  # Assuming layer dimension is 1
+        decoder_hidden = (h_0, c_0)  
 
         for q_t in torch.split(q_emb, split_size_or_sections=1, dim=1):         #(batch_size, 1, hidden_size)
             o_t, decoder_hidden = self.decoder(q_t, decoder_hidden)
@@ -98,11 +98,12 @@ class Seq2Seq(nn.Module):
                 Shape ((batch_size, 1, output_size))
         """
 
-        q_t = self.emb(qw_idxs_t)   # (batch_size, 1, hidden_size)
-        decoder_hidden = dec_init_state     #(batch_size, hidden_size)
+        q_t = self.emb(qw_idx_t)   # (batch_size, 1, hidden_size)
+        h_0, c_0 = decoder_init_state #(batch_size, hidden_size)
+        decoder_hidden =  h_0.unsqueeze(0), c_0.unsqueeze(0) #(1, batch_size, hidden_size)    
 
         o_t, decoder_hidden = self.decoder(q_t, decoder_hidden)
         logits = self.projection(o_t)   #(batch_size, 1, output_size)
-        log_probs = F.log_softmax(logits)    #(batch_size, 1, output_size)
+        log_probs = F.log_softmax(logits, dim=2)    #(batch_size, 1, output_size)
 
         return decoder_hidden, log_probs
