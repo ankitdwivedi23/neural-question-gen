@@ -545,7 +545,7 @@ def torch_from_json(path, dtype=torch.float32):
 
     return tensor
 
-def evaluateRandomly(model, word2idx_dict, idx2word_dict, cw_idx, qw_idx, device):
+def TeacherForce(model, word2idx_dict, idx2word_dict, cw_idx, qw_idx, device):
     SOS = "--SOS--"
     EOS = "--EOS--"
     max_len = 10
@@ -565,6 +565,31 @@ def evaluateRandomly(model, word2idx_dict, idx2word_dict, cw_idx, qw_idx, device
         sent.append(prev_word)
         eos_id = word2idx_dict[EOS] 
         y_tm1 = torch.tensor([[q[t]]], dtype=torch.long, device=device)
+        h_t, log_p_t  = model.module.step(y_tm1, h_t)
+        prev_word = idx2word_dict[log_p_t.argmax(-1).squeeze().tolist()]
+        t = t+1
+
+    print(sent)
+
+def evaluateRandomly(model, word2idx_dict, idx2word_dict, cw_idx, device):
+    SOS = "--SOS--"
+    EOS = "--EOS--"
+    max_len = 10
+
+    c_mask = torch.zeros_like(cw_idx) != cw_idx
+    c_len = c_mask.sum(-1)
+    c_emb = model.module.emb(cw_idx)      
+    c_enc, dec_init_state = model.module.encoder(c_emb, c_len)   
+    prev_word = SOS
+    h_t = dec_init_state[0].unsqueeze(0), dec_init_state[1].unsqueeze(0)
+
+    t = 0
+    sent = []
+
+    while prev_word != EOS and t < max_len:
+        sent.append(prev_word)
+        eos_id = word2idx_dict[EOS] 
+        y_tm1 = torch.tensor([[word2idx_dict[prev_word]]], dtype=torch.long, device=device)
         h_t, log_p_t  = model.module.step(y_tm1, h_t)
         prev_word = idx2word_dict[log_p_t.argmax(-1).squeeze().tolist()]
         t = t+1
