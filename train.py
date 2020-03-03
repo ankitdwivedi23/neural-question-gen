@@ -46,14 +46,20 @@ def main(args):
 
     log.info('Loading word2Idx...')
     word2Idx = json.loads(open(args.word2idx_file).read())
+    Idx2Word = {v: k for (k,v) in word2Idx.items()}
     vocab_size = len(word2Idx)
+
+    def getWords(idxList):
+        words = []
+        for i in idxList:
+            words.append(Idx2Word[i])
+        return words
 
     # Get model
     log.info('Building model...')
     model = Seq2Seq(word_vectors=word_vectors,
-                    vocab_size=vocab_size,
                     hidden_size=args.hidden_size,
-                    output_size=word_vectors.size(0),
+                    output_size=vocab_size,
                     drop_prob=args.drop_prob)
     model = nn.DataParallel(model, args.gpu_ids)
     if args.load_path:
@@ -150,6 +156,10 @@ def main(args):
 
                     # Evaluate and save checkpoint
                     log.info(f'Evaluating at step {step}...')
+                    print(getWords(cw_idx.squeeze().tolist()))
+                    print(getWords(qw_idx.squeeze().tolist()))
+                    util.TeacherForce(model, word2Idx, Idx2Word, cw_idx, qw_idx, device)
+                    util.evaluateRandomly(model, word2Idx, Idx2Word, cw_idx, device)
 
                     ema.assign(model)
                     results = evaluate(model,
