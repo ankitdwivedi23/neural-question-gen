@@ -13,6 +13,7 @@ import torch.optim as optim
 import torch.optim.lr_scheduler as sched
 import torch.utils.data as data
 import util
+import json
 
 from args import get_train_args
 from collections import OrderedDict
@@ -43,11 +44,22 @@ def main(args):
     log.info('Loading embeddings...')
     word_vectors = util.torch_from_json(args.word_emb_file)
 
+    log.info('Loading word2Idx...')
+    word2Idx = json.loads(open(args.word2idx_file).read())
+    Idx2Word = {v: k for (k,v) in word2Idx.items()}
+    vocab_size = len(word2Idx)
+
+    def getWords(idxList):
+        words = []
+        for i in idxList:
+            words.append(Idx2Word[i])
+        return words
+
     # Get model
     log.info('Building model...')
     model = Seq2Seq(word_vectors=word_vectors,
                     hidden_size=args.hidden_size,
-                    output_size=word_vectors.size(0),
+                    output_size=vocab_size,
                     drop_prob=args.drop_prob)
     model = nn.DataParallel(model, args.gpu_ids)
     if args.load_path:
@@ -120,7 +132,6 @@ def main(args):
                 loss_batch = F.nll_loss(log_p, qw_idxs_target, ignore_index=0, reduction='sum')
                 loss = loss_batch / batch_size
                 loss_val = loss.item()
-                ppl = np.exp(loss_batch.item() / tgt_word_num_to_predict)
 
                 # Backward
                 loss.backward()
@@ -145,11 +156,10 @@ def main(args):
 
                     # Evaluate and save checkpoint
                     log.info(f'Evaluating at step {step}...')
-                    
-                    # Temp logging
-                    log.info(f'train loss = {loss_val}')
-                    log.info(f'number of words in training batch = {tgt_word_num_to_predict}')
-                    log.info(f'train PPL = {ppl}')
+                    print(getWords(cw_idxs[batch_size-1].squeeze().tolist()))
+                    print(getWords(qw_idxs[batch_size-1].squeeze().tolist()))
+                    util.TeacherForce(model, word2Idx, Idx2Word, cw_idxs[batch_size-1].unsqueeze(0), qw_idxs[batch_size-1].unsqueeze(0), device)
+                    util.evaluateRandomly(model, word2Idx, Idx2Word, cw_idxs[batch_size-1].unsqueeze(0), device)
 
                     ema.assign(model)
                     results = evaluate(model,
@@ -209,7 +219,7 @@ def evaluate(model, data_loader, device, use_squad_v2):
             progress_bar.update(batch_size)
             progress_bar.set_postfix(NLL=nll_meter.avg)
 
-    ppl = np.exp(cum_loss / cum_tgt_words)
+        ppl = np.exp(cum_loss / cum_tgt_words)
 
     results_list = [('NLL', nll_meter.avg), \
                 ('PPL', ppl)]

@@ -45,7 +45,7 @@ def main(args):
     log.info('Building model...')
     model = Seq2Seq(word_vectors=word_vectors,
                   hidden_size=args.hidden_size,
-                  output_size=len(word_vectors))
+                  output_size=len(word2Idx))
     model = nn.DataParallel(model, gpu_ids)
     log.info(f'Loading checkpoint from {args.load_path}...')
     model = util.load_model(model, args.load_path, gpu_ids, return_step=False)
