@@ -165,6 +165,9 @@ def get_test_args():
                         type=str,
                         default='submission.csv',
                         help='Name for submission file.')
+    parser.add_argument('--word2idx_file',
+                        type=str,
+                        default='./data/word2idx.json')
 
     # Require load_path for test.py
     args = parser.parse_args()
