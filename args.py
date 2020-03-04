@@ -27,19 +27,19 @@ def get_setup_args():
                         default='http://nlp.stanford.edu/data/glove.840B.300d.zip')
     parser.add_argument('--dev_meta_file',
                         type=str,
-                        default='./data/minisample/dev_meta.json')
+                        default='./data/dev_meta.json')
     parser.add_argument('--test_meta_file',
                         type=str,
-                        default='./data/minisample/test_meta.json')
+                        default='./data/test_meta.json')
     parser.add_argument('--word2idx_file',
                         type=str,
-                        default='./data/minisample/word2idx.json')
+                        default='./data/word2idx.json')
     parser.add_argument('--char2idx_file',
                         type=str,
-                        default='./data/minisample/char2idx.json')
+                        default='./data/char2idx.json')
     parser.add_argument('--answer_file',
                         type=str,
-                        default='./data/minisample/answer.json')
+                        default='./data/answer.json')
     parser.add_argument('--para_limit',
                         type=int,
                         default=400,
@@ -136,7 +136,7 @@ def get_train_args():
                         help='Decay rate for exponential moving average of parameters.')
     parser.add_argument('--word2idx_file',
                         type=str,
-                        default='./data/minisample/word2idx.json')
+                        default='./data/word2idx.json')
 
     args = parser.parse_args()
 
@@ -170,7 +170,7 @@ def get_test_args():
                         help='Name for submission file.')
     parser.add_argument('--word2idx_file',
                         type=str,
-                        default='./data/minisample/word2idx.json')
+                        default='./data/word2idx.json')
 
     # Require load_path for test.py
     args = parser.parse_args()
@@ -184,28 +184,28 @@ def add_common_args(parser):
     """Add arguments common to all 3 scripts: setup.py, train.py, test.py"""
     parser.add_argument('--train_record_file',
                         type=str,
-                        default='./data/minisample/train.npz')
+                        default='./data/train.npz')
     parser.add_argument('--dev_record_file',
                         type=str,
-                        default='./data/minisample/dev.npz')
+                        default='./data/dev.npz')
     parser.add_argument('--test_record_file',
                         type=str,
-                        default='./data/minisample/test.npz')
+                        default='./data/test.npz')
     parser.add_argument('--word_emb_file',
                         type=str,
-                        default='./data/minisample/word_emb.json')
+                        default='./data/word_emb.json')
     parser.add_argument('--char_emb_file',
                         type=str,
-                        default='./data/minisample/char_emb.json')
+                        default='./data/char_emb.json')
     parser.add_argument('--train_eval_file',
                         type=str,
-                        default='./data/minisample/train_eval.json')
+                        default='./data/train_eval.json')
     parser.add_argument('--dev_eval_file',
                         type=str,
-                        default='./data/minisample/dev_eval.json')
+                        default='./data/dev_eval.json')
     parser.add_argument('--test_eval_file',
                         type=str,
-                        default='./data/minisample/test_eval.json')
+                        default='./data/test_eval.json')
 
 
 def add_train_test_args(parser):
