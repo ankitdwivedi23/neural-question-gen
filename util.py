@@ -556,7 +556,8 @@ def TeacherForce(model, word2idx_dict, idx2word_dict, cw_idx, qw_idx, device):
     c_emb = model.module.emb(cw_idx)      
     c_enc, dec_init_state = model.module.encoder(c_emb, c_len)   
     prev_word = SOS
-    h_t = dec_init_state[0].unsqueeze(0), dec_init_state[1].unsqueeze(0)
+    #h_t = dec_init_state[0].unsqueeze(0), dec_init_state[1].unsqueeze(0)
+    h_t = dec_init_state
 
     t = 0
     sent = []
@@ -565,7 +566,7 @@ def TeacherForce(model, word2idx_dict, idx2word_dict, cw_idx, qw_idx, device):
         sent.append(prev_word)
         eos_id = word2idx_dict[EOS] 
         y_tm1 = torch.tensor([[q[t]]], dtype=torch.long, device=device)
-        h_t, log_p_t  = model.module.step(y_tm1, h_t)
+        h_t, log_p_t  = model.module.decode(h_t, y_tm1)
         prev_word = idx2word_dict[log_p_t.argmax(-1).squeeze().tolist()]
         t = t+1
 
@@ -581,7 +582,8 @@ def evaluateRandomly(model, word2idx_dict, idx2word_dict, cw_idx, device):
     c_emb = model.module.emb(cw_idx)      
     c_enc, dec_init_state = model.module.encoder(c_emb, c_len)   
     prev_word = SOS
-    h_t = dec_init_state[0].unsqueeze(0), dec_init_state[1].unsqueeze(0)
+    #h_t = dec_init_state[0].unsqueeze(0), dec_init_state[1].unsqueeze(0)
+    h_t = dec_init_state
 
     t = 0
     sent = []
@@ -590,7 +592,7 @@ def evaluateRandomly(model, word2idx_dict, idx2word_dict, cw_idx, device):
         sent.append(prev_word)
         eos_id = word2idx_dict[EOS] 
         y_tm1 = torch.tensor([[word2idx_dict[prev_word]]], dtype=torch.long, device=device)
-        h_t, log_p_t  = model.module.step(y_tm1, h_t)
+        h_t, log_p_t  = model.module.decode(h_t, y_tm1)
         prev_word = idx2word_dict[log_p_t.argmax(-1).squeeze().tolist()]
         t = t+1
 
@@ -622,7 +624,8 @@ def beamSearch(model, word2idx_dict, idx2word_dict, cw_idx, device, beam_size: i
     c_emb = model.module.emb(cw_idx)         # (1, c_len, hidden_size)
     c_enc, dec_init_state = model.module.encoder(c_emb, c_len)    # (1, c_len, 2 * hidden_size)
 
-    h_tm1 = dec_init_state[0].unsqueeze(0), dec_init_state[1].unsqueeze(0)
+    #h_tm1 = dec_init_state[0].unsqueeze(0), dec_init_state[1].unsqueeze(0)
+    h_tm1 = dec_init_state
     eos_id = word2idx_dict[EOS] 
     vocab_size = len(model.module.word_vectors)
 
@@ -639,8 +642,8 @@ def beamSearch(model, word2idx_dict, idx2word_dict, cw_idx, device, beam_size: i
 
         # (batch_size, 1)
         y_tm1 = torch.tensor([word2idx_dict[hyp[-1]] for hyp in hypotheses], dtype=torch.long, device=device)
-        h_t, log_p_t  = model.module.step(y_tm1.unsqueeze(1), h_tm1)
-        h_t = h_t[0].permute(1,0,2), h_t[0].permute(1,0,2)  
+        h_t, log_p_t  = model.module.decode(h_tm1, y_tm1.unsqueeze(1))
+        #h_t = h_t[0].permute(1,0,2), h_t[0].permute(1,0,2)  
 
         live_hyp_num = beam_size - len(completed_hypotheses)
         contiuating_hyp_scores = (hyp_scores.unsqueeze(1).unsqueeze(2).expand_as(log_p_t) + log_p_t).contiguous().view(-1)
@@ -672,7 +675,8 @@ def beamSearch(model, word2idx_dict, idx2word_dict, cw_idx, device, beam_size: i
             break
 
         live_hyp_ids = torch.tensor(live_hyp_ids, dtype=torch.long, device=device)
-        h_tm1 = h_t[0][live_hyp_ids].permute(1,0,2), h_t[1][live_hyp_ids].permute(1,0,2)
+        #h_tm1 = h_t[0][live_hyp_ids].permute(1,0,2), h_t[1][live_hyp_ids].permute(1,0,2)
+        h_tm1 = h_t
         hypotheses = new_hypotheses
         hyp_scores = torch.tensor(new_hyp_scores, dtype=torch.float, device=device)
 
