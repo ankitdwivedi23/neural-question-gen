@@ -68,6 +68,9 @@ def main(args):
     nll_meter = util.AverageMeter()
     pred_dict = {}  # Predictions by Beam Search
     eval_file = vars(args)[f'{args.split}_eval_file']
+    cw_list = []
+    qw_list = []
+
     with open(eval_file, 'r') as fh:
         gold_dict = json_load(fh)
     with torch.no_grad(), \
@@ -94,11 +97,18 @@ def main(args):
                     pred_dict[cw_idx].append(hyp.value)
                 nll_meter.update(loss, batch_size)
                 wait = input("Sab chill hai.. press to continue")
+
+                cw_list(cw_idx)
+                qw_list(qw_idx)
+
             # Log info
             progress_bar.update(batch_size)
             if args.split != 'test':
                 # No labels for the test set, so NLL would be invalid
                 progress_bar.set_postfix(NLL=nll_meter.avg)
+
+    estimateBLEU(model, args.split, word2idx_dict, idx2word_dict, cw_idx_list, qw_idx_list, device)
+        
 '''
 
     # Log results (except for test set, since it does not come with labels)

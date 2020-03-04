@@ -17,6 +17,7 @@ from collections import Counter
 from collections import namedtuple
 Hypothesis = namedtuple('Hypothesis', ['value', 'score'])
 from typing import List, Tuple, Dict, Set, Union
+from torchtext.data.metrics import bleu_score
 
 class SQuAD(data.Dataset):
     """Stanford Question Answering Dataset (SQuAD).
@@ -597,6 +598,59 @@ def evaluateRandomly(model, word2idx_dict, idx2word_dict, cw_idx, device):
         t = t+1
 
     print(sent)
+
+def evaluate(model, word2idx_dict, idx2word_dict, cw_idx, device):
+    SOS = "--SOS--"
+    EOS = "--EOS--"
+    max_len = 30
+
+    c_mask = torch.zeros_like(cw_idx) != cw_idx
+    c_len = c_mask.sum(-1)
+    c_emb = model.module.emb(cw_idx)      
+    c_enc, dec_init_state = model.module.encoder(c_emb, c_len)   
+    prev_word = SOS
+    h_t = dec_init_state
+
+    t = 0
+    sent = []
+
+    while prev_word != EOS and t < max_len:
+        sent.append(prev_word)
+        eos_id = word2idx_dict[EOS] 
+        y_tm1 = torch.tensor([[word2idx_dict[prev_word]]], dtype=torch.long, device=device)
+        h_t, log_p_t  = model.module.decode(h_t, y_tm1)
+        prev_word = idx2word_dict[log_p_t.argmax(-1).squeeze().tolist()]
+        t = t+1
+
+    return sent
+
+def evaluate_cqo(model, word2idx_dict, idx2word_dict, cw_idx, qw_idx, device):
+    output_words = evaluate(model, word2idx_dict, idx2word_dict, cw_idx, device)
+    output_sentence = ' '.join(output_words)
+    gold_sentence = ' '.join([idx2word_dict[id] for id in qw_idx])
+    return context, gold_sentence, output_sentence
+
+
+def FindCandidatesAndReferencesForBLEU(model, word2idx_dict, idx2word_dict, cw_idx_list, qw_idx_list, device):
+    dic  = {}
+    candidates = {}
+    for x,y in list(zip(cw_idx_list, qw_idx_list)):
+        c, q, output = evaluate_cqo(model, word2idx_dict, idx2word_dict, x, y, device)
+        if c in dic.keys():
+            dic[c].append(q.split())
+        else:
+            dic[c] = [q.split()]
+        candidates[c] = output
+    return list(candidates.values()), list(dic.values())
+
+# Estimate BLEU for set
+
+def estimateBLEU(model, set_name, word2idx_dict, idx2word_dict, cw_idx_list, qw_idx_list, device):
+    for i in range(1,5):
+        candidate_corpus, references_corpus = FindCandidatesAndReferencesForBLEU(model, word2idx_dict, idx2word_dict, cw_idx_list, qw_idx_list, device)
+        bleu_test = bleu_score(candidate_corpus, references_corpus, max_n=i, weights=[1./i]*i)
+        print("BLEU-" + str(i) + " on " + set_name + " :" + str(bleu_test))
+    return
 
 def beamSearch(model, word2idx_dict, idx2word_dict, cw_idx, device, beam_size: int=1, max_decoding_time_step: int=70)-> List[Hypothesis]:
     """Discretize soft predictions to get question text.
