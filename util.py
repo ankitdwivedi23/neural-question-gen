@@ -598,7 +598,7 @@ def evaluateRandomly(model, word2idx_dict, idx2word_dict, cw_idx, device):
 
     print(sent)
 
-def beamSearch(model, word2idx_dict, idx2word_dict, cw_idx, device, beam_size: int=5, max_decoding_time_step: int=70)-> List[Hypothesis]:
+def beamSearch(model, word2idx_dict, idx2word_dict, cw_idx, device, beam_size: int=1, max_decoding_time_step: int=70)-> List[Hypothesis]:
     """Discretize soft predictions to get question text.
 
     Args:
@@ -641,7 +641,7 @@ def beamSearch(model, word2idx_dict, idx2word_dict, cw_idx, device, beam_size: i
         exp_c_enc = c_enc.expand(hyp_num, c_enc.size(1), c_enc.size(2))
 
         # (batch_size, 1)
-        y_tm1 = torch.tensor([word2idx_dict[hyp[-1]] for hyp in hypotheses], dtype=torch.long, device=device)
+        y_tm1 = torch.tensor([[word2idx_dict[hyp[-1]]] for hyp in hypotheses], dtype=torch.long, device=device)
         h_t, log_p_t  = model.module.decode(h_tm1, y_tm1)
         #h_t = h_t[0].permute(1,0,2), h_t[0].permute(1,0,2)  
 
