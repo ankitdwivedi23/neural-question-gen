@@ -30,8 +30,8 @@ class Embedding(nn.Module):
     def forward(self, x):
         emb = self.embed(x)   # (batch_size, seq_len, embed_size)
         emb = F.dropout(emb, self.drop_prob, self.training)
-        emb = self.proj(emb)  # (batch_size, seq_len, hidden_size)
-        emb = self.hwy(emb)   # (batch_size, seq_len, hidden_size)
+        #emb = self.proj(emb)  # (batch_size, seq_len, hidden_size)
+        #emb = self.hwy(emb)   # (batch_size, seq_len, hidden_size)
 
         return emb
 
@@ -144,7 +144,22 @@ class DecoderRNN(nn.Module):
         self.rnn = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True)
 
     def forward(self, input, hidden):
-        output = F.relu(input)
         self.rnn.flatten_parameters()
-        output, hidden = self.rnn(output, hidden)
+        output, hidden = self.rnn(input, hidden)
         return output, hidden
+
+class DecoderRNNCell(nn.Module):
+    """General-purpose layer for decoding the output of an encoder using RNN.
+    Args:
+        input_size (int): Size of a single timestep in the input.
+        hidden_size (int): Size of the RNN hidden state.
+    """
+    def __init__(self, input_size, hidden_size):
+        super(DecoderRNNCell, self).__init__()
+        self.input_size = input_size
+        self.hidden_size = hidden_size
+        self.rnn = nn.LSTMCell(input_size, hidden_size)
+
+    def forward(self, input, hidden):
+        hidden = self.rnn(input, hidden)
+        return hidden

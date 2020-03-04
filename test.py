@@ -45,7 +45,8 @@ def main(args):
     log.info('Building model...')
     model = Seq2Seq(word_vectors=word_vectors,
                   hidden_size=args.hidden_size,
-                  output_size=len(word2Idx))
+                  output_size=len(word2Idx),
+                  device=device)
     model = nn.DataParallel(model, gpu_ids)
     log.info(f'Loading checkpoint from {args.load_path}...')
     model = util.load_model(model, args.load_path, gpu_ids, return_step=False)
@@ -81,6 +82,7 @@ def main(args):
             for cw_idx, qw_idx in zip(torch.split(cw_idxs, split_size_or_sections=1, dim=0), torch.split(qw_idxs, split_size_or_sections=1, dim=0)):
                 #y = F.one_hot(qw_idx, num_classes=len(word_vectors))
                 print(getWords(cw_idx.squeeze().tolist()))
+                print(getWords(qw_idx.squeeze().tolist()))
                 util.TeacherForce(model, word2Idx, Idx2Word, cw_idx, qw_idx, device)
                 util.evaluateRandomly(model, word2Idx, Idx2Word, cw_idx, device)
                 hypotheses = util.beamSearch(model, word2Idx, Idx2Word, cw_idx, device)
