@@ -31,17 +31,17 @@ class Seq2Seq(nn.Module):
 
         self.word_vectors = word_vectors
         
-        self.emb = layers.Embedding(word_vectors=word_vectors,
-                                    hidden_size=hidden_size,
-                                    drop_prob=drop_prob)
+        #self.emb = layers.Embedding(word_vectors=word_vectors,
+        #                            hidden_size=hidden_size,
+        #                            drop_prob=drop_prob)
 
-        #self.emb = nn.Embedding(num_embeddings=output_size, embedding_dim=hidden_size)
+        self.emb = nn.Embedding(num_embeddings=output_size, embedding_dim=hidden_size)
         self.encoder = layers.EncoderRNN(input_size=word_vectors.size(1),
                                      hidden_size=hidden_size,
                                      num_layers=1,
                                      drop_prob=drop_prob)
 
-        self.decoder = layers.DecoderRNN(input_size=word_vectors.size(1), 
+        self.decoder = layers.DecoderRNN(input_size=hidden_size, 
                                         hidden_size=hidden_size,
                                         num_layers=1)
 
