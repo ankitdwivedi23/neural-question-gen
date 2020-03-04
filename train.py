@@ -18,7 +18,7 @@ import json
 from args import get_train_args
 from collections import OrderedDict
 from json import dumps
-from models import Seq2Seq
+from models import Seq2Seq, Seq2SeqAttn
 from tensorboardX import SummaryWriter
 from tqdm import tqdm
 from ujson import load as json_load
@@ -57,7 +57,7 @@ def main(args):
 
     # Get model
     log.info('Building model...')
-    model = Seq2Seq(word_vectors=word_vectors,
+    model = Seq2SeqAttn(word_vectors=word_vectors,
                     hidden_size=args.hidden_size,
                     output_size=vocab_size,
                     device=device,
