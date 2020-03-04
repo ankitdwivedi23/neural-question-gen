@@ -84,10 +84,11 @@ def main(args):
             # Forward
             for cw_idx, qw_idx in zip(torch.split(cw_idxs, split_size_or_sections=1, dim=0), torch.split(qw_idxs, split_size_or_sections=1, dim=0)):
                 #y = F.one_hot(qw_idx, num_classes=len(word_vectors))
-                print(getWords(cw_idx.squeeze().tolist()))
-                print(getWords(qw_idx.squeeze().tolist()))
-                util.TeacherForce(model, word2Idx, Idx2Word, cw_idx, qw_idx, device)
-                util.evaluateRandomly(model, word2Idx, Idx2Word, cw_idx, device)
+                #print(getWords(cw_idx.squeeze().tolist()))
+                #print(getWords(qw_idx.squeeze().tolist()))
+                #util.TeacherForce(model, word2Idx, Idx2Word, cw_idx, qw_idx, device)
+                #util.evaluateRandomly(model, word2Idx, Idx2Word, cw_idx, device)
+
                 hypotheses = util.beamSearch(model, word2Idx, Idx2Word, cw_idx, device)
                 loss = 0.
                 pred_dict[cw_idx] = []
@@ -96,10 +97,10 @@ def main(args):
                     loss = loss + hyp.score
                     pred_dict[cw_idx].append(hyp.value)
                 nll_meter.update(loss, batch_size)
-                wait = input("Sab chill hai.. press to continue")
+                #wait = input("Sab chill hai.. press to continue")
 
-                cw_list(cw_idx)
-                qw_list(qw_idx)
+                cw_list.append(cw_idx)
+                qw_list.append(qw_idx)
 
             # Log info
             progress_bar.update(batch_size)
@@ -107,7 +108,7 @@ def main(args):
                 # No labels for the test set, so NLL would be invalid
                 progress_bar.set_postfix(NLL=nll_meter.avg)
 
-    estimateBLEU(model, args.split, word2idx_dict, idx2word_dict, cw_idx_list, qw_idx_list, device)
+    util.estimateBLEU(model, args.split, word2Idx, Idx2Word, cw_list, qw_list, device)
         
 '''
 

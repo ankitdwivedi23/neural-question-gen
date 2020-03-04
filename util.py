@@ -627,7 +627,8 @@ def evaluate(model, word2idx_dict, idx2word_dict, cw_idx, device):
 def evaluate_cqo(model, word2idx_dict, idx2word_dict, cw_idx, qw_idx, device):
     output_words = evaluate(model, word2idx_dict, idx2word_dict, cw_idx, device)
     output_sentence = ' '.join(output_words)
-    gold_sentence = ' '.join([idx2word_dict[id] for id in qw_idx])
+    gold_sentence = ' '.join([idx2word_dict[id] for id in qw_idx.squeeze().tolist()])
+    context = ' '.join([idx2word_dict[id] for id in cw_idx.squeeze().tolist()])
     return context, gold_sentence, output_sentence
 
 
@@ -640,7 +641,7 @@ def FindCandidatesAndReferencesForBLEU(model, word2idx_dict, idx2word_dict, cw_i
             dic[c].append(q.split())
         else:
             dic[c] = [q.split()]
-        candidates[c] = output
+        candidates[c] = output.split()
     return list(candidates.values()), list(dic.values())
 
 # Estimate BLEU for set
@@ -739,7 +740,7 @@ def beamSearch(model, word2idx_dict, idx2word_dict, cw_idx, device, beam_size: i
                                                 score=hyp_scores[0].item()))
 
     completed_hypotheses.sort(key=lambda hyp: hyp.score, reverse=True)
-    print(completed_hypotheses)
+    #print(completed_hypotheses)
     return completed_hypotheses
 
 
