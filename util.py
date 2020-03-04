@@ -642,7 +642,7 @@ def beamSearch(model, word2idx_dict, idx2word_dict, cw_idx, device, beam_size: i
 
         # (batch_size, 1)
         y_tm1 = torch.tensor([word2idx_dict[hyp[-1]] for hyp in hypotheses], dtype=torch.long, device=device)
-        h_t, log_p_t  = model.module.decode(h_tm1, y_tm1.unsqueeze(1))
+        h_t, log_p_t  = model.module.decode(h_tm1, y_tm1)
         #h_t = h_t[0].permute(1,0,2), h_t[0].permute(1,0,2)  
 
         live_hyp_num = beam_size - len(completed_hypotheses)
