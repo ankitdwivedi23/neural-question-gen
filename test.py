@@ -9,7 +9,7 @@ import json
 from args import get_test_args
 from collections import OrderedDict
 from json import dumps
-from models import Seq2Seq
+from models import Seq2Seq, Seq2SeqAttn
 from os.path import join
 from tensorboardX import SummaryWriter
 from tqdm import tqdm
@@ -43,7 +43,7 @@ def main(args):
 
     # Get model
     log.info('Building model...')
-    model = Seq2Seq(word_vectors=word_vectors,
+    model = Seq2SeqAttn(word_vectors=word_vectors,
                   hidden_size=args.hidden_size,
                   output_size=len(word2Idx),
                   device=device)

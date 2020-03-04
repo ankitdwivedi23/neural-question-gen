@@ -551,11 +551,9 @@ def TeacherForce(model, word2idx_dict, idx2word_dict, cw_idx, qw_idx, device):
     EOS = "--EOS--"
     max_len = 10
 
-    q = qw_idx.squeeze().tolist()
-    c_mask = torch.zeros_like(cw_idx) != cw_idx
-    c_len = c_mask.sum(-1)
-    c_emb = model.module.emb(cw_idx)      
-    c_enc, dec_init_state = model.module.encoder(c_emb, c_len)   
+    q = qw_idx.squeeze().tolist()  
+    _, dec_init_state = model.module.encode(cw_idx)
+    
     prev_word = SOS
     #h_t = dec_init_state[0].unsqueeze(0), dec_init_state[1].unsqueeze(0)
     h_t = dec_init_state
@@ -578,10 +576,8 @@ def evaluateRandomly(model, word2idx_dict, idx2word_dict, cw_idx, device):
     EOS = "--EOS--"
     max_len = 10
 
-    c_mask = torch.zeros_like(cw_idx) != cw_idx
-    c_len = c_mask.sum(-1)
-    c_emb = model.module.emb(cw_idx)      
-    c_enc, dec_init_state = model.module.encoder(c_emb, c_len)   
+    _, dec_init_state = model.module.encode(cw_idx)
+
     prev_word = SOS
     #h_t = dec_init_state[0].unsqueeze(0), dec_init_state[1].unsqueeze(0)
     h_t = dec_init_state
@@ -604,10 +600,8 @@ def evaluate(model, word2idx_dict, idx2word_dict, cw_idx, device):
     EOS = "--EOS--"
     max_len = 30
 
-    c_mask = torch.zeros_like(cw_idx) != cw_idx
-    c_len = c_mask.sum(-1)
-    c_emb = model.module.emb(cw_idx)      
-    c_enc, dec_init_state = model.module.encoder(c_emb, c_len)   
+    _, dec_init_state = model.module.encode(cw_idx)
+
     prev_word = SOS
     h_t = dec_init_state
 
@@ -674,10 +668,7 @@ def beamSearch(model, word2idx_dict, idx2word_dict, cw_idx, device, beam_size: i
     SOS = "--SOS--"
     EOS = "--EOS--"
 
-    c_mask = torch.zeros_like(cw_idx) != cw_idx
-    c_len = c_mask.sum(-1)
-    c_emb = model.module.emb(cw_idx)         # (1, c_len, hidden_size)
-    c_enc, dec_init_state = model.module.encoder(c_emb, c_len)    # (1, c_len, 2 * hidden_size)
+    c_enc, dec_init_state = model.module.encode(cw_idx)     # (1, c_len, 2 * hidden_size)
 
     #h_tm1 = dec_init_state[0].unsqueeze(0), dec_init_state[1].unsqueeze(0)
     h_tm1 = dec_init_state
