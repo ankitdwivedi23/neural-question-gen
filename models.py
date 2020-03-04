@@ -160,12 +160,12 @@ class Seq2Seq(nn.Module):
         @param qw_idx_t (Tensor): t_th word Index of question.
                 Shape (batch_size, 1).
         @param decoder_init_state (Tuple(Tensor)): Decoder's prev hidden state
-                Shape (batch_size, 1, hidden_size)
+                Shape (1, batch_size, hidden_size)
 
         @returns dec_hidden (Tensor): Decoder's hidden state after passing q_t and previous hidden state
                 Shape (batch_size, hidden_size)
         @returns log_probs (Tensor): Soft prediction for next word index
-                Shape ((batch_size, 1, output_size))
+                Shape ((1, batch_size, output_size))
         """
 
         q_t = self.emb(qw_idx_t)   # (batch_size, 1, hidden_size)
