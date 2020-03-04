@@ -36,7 +36,7 @@ class Seq2Seq(nn.Module):
         #                            drop_prob=drop_prob)
 
         self.emb = nn.Embedding(num_embeddings=output_size, embedding_dim=hidden_size)
-        self.encoder = layers.EncoderRNN(input_size=word_vectors.size(1),
+        self.encoder = layers.EncoderRNN(input_size=hidden_size,
                                      hidden_size=hidden_size,
                                      num_layers=1,
                                      drop_prob=drop_prob)
