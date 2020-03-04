@@ -69,7 +69,7 @@ class Seq2Seq(nn.Module):
 
         @returns dec_state (tuple(Tensor, Tensor), log_probs (Tensor):   tuple of final decoder hidden state and cell state of shape (b, h), 
                                                                         and log_probs of shape (b, q_len, h), where b = batch_size,
-                                                                        q_len = maximum target sentence length,  h = hidden size
+                                                                        q_len = maximum question length,  h = hidden size
         """        
         dec_state = dec_init_state        #(batch_size, hidden_size)
         
@@ -90,8 +90,7 @@ class Seq2Seq(nn.Module):
         log_probs = F.log_softmax(logits, dim=-1)        #(batch_size, q_len, output_size)
         return dec_state, log_probs
 
-    ########################################## Old baseline functions ######################################################
-    
+    ########################################## Old baseline functions ######################################################    
 
     def __init__1(self, word_vectors, hidden_size, output_size, drop_prob=0.):
         super(Seq2Seq, self).__init__()
