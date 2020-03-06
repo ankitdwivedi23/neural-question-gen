@@ -95,7 +95,7 @@ def get_train_args():
 
     parser.add_argument('--valid_niter',
                         type=int,
-                        default=50000,
+                        default=10,
                         help='Number of iterations between successive evaluations.')
     parser.add_argument('--log_every',
                         type=int,

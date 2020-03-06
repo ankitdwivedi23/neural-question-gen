@@ -163,7 +163,7 @@ def main(args):
                                                                                          math.exp(report_loss / report_tgt_words),
                                                                                          cum_examples,
                                                                                          report_tgt_words / (time.time() - train_time),
-                                                                                         time.time() - begin_time), file=sys.stderr)
+                                                                                         time.time() - begin_time))
 
                     train_time = time.time()
                     report_loss = report_tgt_words = report_examples = 0.
@@ -173,7 +173,7 @@ def main(args):
                     log.info('epoch %d, iter %d, cum. loss %.2f, cum. ppl %.2f cum. examples %d' % (epoch, train_iter,
                                                                                             cum_loss / cum_examples,
                                                                                             np.exp(cum_loss / cum_tgt_words),
-                                                                                            cum_examples), file=sys.stderr)
+                                                                                            cum_examples))
 
                     cum_loss = cum_examples = cum_tgt_words = 0.
                     valid_num += 1
@@ -187,11 +187,11 @@ def main(args):
                     # compute dev metrics
                     results = evaluate(model, dev_loader, device, args.use_squad_v2)
 
-                    print('validation: iter %d, dev. ppl %f' % (train_iter, results[args.metric_name]), file=sys.stderr)
+                    log.info('validation: iter %d, dev. ppl %f' % (train_iter, results[args.metric_name]))
 
                     if saver.is_best(results[args.metric_name]):
                         patience = 0
-                        print('save currently the best model to [%s]' % model_save_path, file=sys.stderr)
+                        log.info('save currently the best model to [%s]' % model_save_path)
                         saver.save(step, model, results[args.metric_name], device)
 
                         # also save the optimizers' state
@@ -199,22 +199,22 @@ def main(args):
                     
                     elif patience < args.patience_limit:
                         patience += 1
-                        print('hit patience %d' % patience, file=sys.stderr)
+                        log.info('hit patience %d' % patience)
 
                         if patience == args.patience_limit:
                             num_trial += 1
-                            print('hit #%d trial' % num_trial, file=sys.stderr)
+                            log.info('hit #%d trial' % num_trial)
                             if num_trial == args.max_num_trials:
-                                print('early stop!', file=sys.stderr)
+                                log.info('early stop!')
                                 exit(0)
 
                             # decay lr, and restore from previously best checkpoint
                             lr = optimizer.param_groups[0]['lr'] * args.lr_decay
-                            print('load previously best model and decay learning rate to %f' % lr, file=sys.stderr)
+                            log.info('load previously best model and decay learning rate to %f' % lr)
 
                             model, step = util.load_model(model, args.save_path, args.gpu_ids)
 
-                            print('restore parameters of the optimizers', file=sys.stderr)
+                            log.info('restore parameters of the optimizers')
                             optimizer.load_state_dict(torch.load(model_save_path + '.optim'))
 
                             # set new lr
@@ -225,7 +225,7 @@ def main(args):
                             patience = 0
 
                     if epoch == args.num_epochs:
-                        print('reached maximum number of epochs!', file=sys.stderr)
+                        log.info('reached maximum number of epochs!')
                         exit(0)
                             
                 """
