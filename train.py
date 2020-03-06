@@ -212,7 +212,7 @@ def main(args):
                             lr = optimizer.param_groups[0]['lr'] * args.lr_decay
                             log.info('load previously best model and decay learning rate to %f' % lr)
 
-                            model, step = util.load_model(model, args.save_path, args.gpu_ids)
+                            model, step = util.load_model(model, model_save_path, args.gpu_ids)
 
                             log.info('restore parameters of the optimizers')
                             optimizer.load_state_dict(torch.load(model_save_path + '.optim'))
