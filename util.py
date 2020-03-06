@@ -229,6 +229,7 @@ class CheckpointSaver:
 
     Args:
         save_dir (str): Directory to save checkpoints.
+        best_model_name (str): File name of the best model.
         max_checkpoints (int): Maximum number of checkpoints to keep before
             overwriting old ones.
         metric_name (str): Name of metric used to determine best model.
@@ -237,11 +238,12 @@ class CheckpointSaver:
             minimizes the metric.
         log (logging.Logger): Optional logger for printing information.
     """
-    def __init__(self, save_dir, max_checkpoints, metric_name,
+    def __init__(self, save_dir, best_model_name, max_checkpoints, metric_name,
                  maximize_metric=False, log=None):
         super(CheckpointSaver, self).__init__()
 
         self.save_dir = save_dir
+        self.best_model_name = best_model_name
         self.max_checkpoints = max_checkpoints
         self.metric_name = metric_name
         self.maximize_metric = maximize_metric
@@ -296,7 +298,7 @@ class CheckpointSaver:
         if self.is_best(metric_val):
             # Save the best model
             self.best_val = metric_val
-            best_path = os.path.join(self.save_dir, 'best.pth.tar')
+            best_path = os.path.join(self.save_dir, self.best_model_name)
             shutil.copy(checkpoint_path, best_path)
             self._print(f'New best checkpoint at step {step}...')
 
