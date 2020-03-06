@@ -224,9 +224,9 @@ def main(args):
                             # reset patience
                             patience = 0
 
-                    if epoch == args.num_epochs:
-                        log.info('reached maximum number of epochs!')
-                        exit(0)
+                if epoch == args.num_epochs:
+                    log.info('reached maximum number of epochs!')
+                    exit(0)
                             
                 """
                 steps_till_eval -= batch_size
