@@ -93,14 +93,30 @@ def get_train_args():
     add_common_args(parser)
     add_train_test_args(parser)
 
-    parser.add_argument('--eval_steps',
+    parser.add_argument('--valid_niter',
                         type=int,
-                        default=50000,
-                        help='Number of steps between successive evaluations.')
+                        default=10,
+                        help='Number of iterations between successive evaluations.')
+    parser.add_argument('--log_every',
+                        type=int,
+                        default=10,
+                        help='Number of iterations between successive logging')
     parser.add_argument('--lr',
                         type=float,
-                        default=0.5,
+                        default=0.001,
                         help='Learning rate.')
+    parser.add_argument('--lr_decay',
+                        type=float,
+                        default=0.5,
+                        help='Learning rate decay')
+    parser.add_argument('--patience_limit',
+                        type=int,
+                        default=5,
+                        help='Wait for how many iterations to decay learning rate')
+    parser.add_argument('--max_num_trials',
+                        type=int,
+                        default=5,
+                        help='Terminate training after how many trials')
     parser.add_argument('--l2_wd',
                         type=float,
                         default=0,
@@ -227,6 +243,10 @@ def add_train_test_args(parser):
                         type=str,
                         default='./save/',
                         help='Base directory for saving information.')
+    parser.add_argument('--best_model_name',
+                        type=str,
+                        default='best.pth.tar',
+                        help='File name of the best model')
     parser.add_argument('--batch_size',
                         type=int,
                         default=64,
