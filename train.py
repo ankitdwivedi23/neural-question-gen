@@ -82,8 +82,7 @@ def main(args):
     model = Seq2Seq(word_vectors=word_vectors,
                     hidden_size=args.hidden_size,
                     output_size=vocab_size,
-                    device=device,
-                    drop_prob=args.drop_prob)
+                    device=device)
     model = nn.DataParallel(model, args.gpu_ids)
     if args.load_path:
         log.info(f'Loading checkpoint from {args.load_path}...')
@@ -144,13 +143,11 @@ def main(args):
                 qw_idxs = qw_idxs.to(device)
                 batch_size = re_cw_idxs.size(0)
                 optimizer.zero_grad()
-
-                '''
-                c_mask = torch.zeros_like(cw_idxs) != cw_idxs
-                c_len = c_mask.sum(-1)
-                p = percentile(c_len, 80)
-                cw_idxs = cw_idxs[:,:p[0].item()]
-                '''
+                
+                #c_mask = torch.zeros_like(cw_idxs) != cw_idxs
+                #c_len = c_mask.sum(-1)
+                #p = percentile(c_len, 80)
+                #cw_idxs = cw_idxs[:,:p[0].item()]
 
                 # Forward
                 log_p = model(re_cw_idxs, qw_idxs)        #(batch_size, q_len, vocab_size)
@@ -197,9 +194,9 @@ def main(args):
                     train_time = time.time()
                     report_loss = report_tgt_words = report_examples = 0.
 
-                    print(getWords(re_cw_idxs[batch_size-1].squeeze().tolist()))
-                    print(getWords(qw_idxs[batch_size-1].squeeze().tolist()))
-                    util.evaluateRandomly(model, word2Idx, Idx2Word, re_cw_idxs[batch_size-1].unsqueeze(0), device)
+                    #print(getWords(re_cw_idxs[batch_size-1].squeeze().tolist()))
+                    #print(getWords(qw_idxs[batch_size-1].squeeze().tolist()))
+                    #util.evaluateRandomly(model, word2Idx, Idx2Word, re_cw_idxs[batch_size-1].unsqueeze(0), device)
                 
                 # perform validation
                 if train_iter % args.valid_niter == 0:
@@ -256,32 +253,6 @@ def main(args):
                 if epoch == args.num_epochs:
                     log.info('reached maximum number of epochs!')
                     exit(0)
-                            
-                """
-                steps_till_eval -= batch_size
-                if steps_till_eval <= 0:
-                    steps_till_eval = args.eval_steps
-
-                    # Evaluate and save checkpoint
-                    log.info(f'Evaluating at step {step}...')
-                    #print(getWords(cw_idxs[batch_size-1].squeeze().tolist()))
-                    #print(getWords(qw_idxs[batch_size-1].squeeze().tolist()))
-                    #util.TeacherForce(model, word2Idx, Idx2Word, cw_idxs[batch_size-1].unsqueeze(0), qw_idxs[batch_size-1].unsqueeze(0), device)
-                    #util.evaluateRandomly(model, word2Idx, Idx2Word, cw_idxs[batch_size-1].unsqueeze(0), device)
-
-                    #ema.assign(model)
-                    results = evaluate(model,
-                                       dev_loader,
-                                       device,
-                                       args.use_squad_v2)
-                    saver.save(step, model, results[args.metric_name], device)
-                    #ema.resume(model)
-
-                    # Log to console
-                    results_str = ', '.join(f'{k}: {v:05.2f}' for k, v in results.items())
-                    log.info(f'Dev {results_str}')
-                """
-
 
 def evaluate(model, data_loader, device, use_squad_v2):
     """ Evaluate on dev questions

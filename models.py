@@ -24,7 +24,7 @@ class Seq2Seq(nn.Module):
         device (string): 'cuda:0' or 'cpu'
         drop_prob (float): Dropout probability.
     """
-    def __init__(self, word_vectors, hidden_size, output_size, device, drop_prob=0.):
+    def __init__(self, word_vectors, hidden_size, output_size, device, drop_prob=0., num_layers=1):
         super(Seq2Seq, self).__init__()
 
         self.hidden_size = hidden_size
@@ -36,11 +36,12 @@ class Seq2Seq(nn.Module):
         
         self.encoder = layers.EncoderRNN(input_size=hidden_size,
                                      hidden_size=hidden_size,
-                                     num_layers=1,
+                                     num_layers=num_layers,
                                      drop_prob=drop_prob)
 
-        self.decoder = layers.DecoderRNNCell(input_size=hidden_size,
-                                            hidden_size=hidden_size)      
+        self.decoder = layers.DecoderRNN(input_size=hidden_size,
+                                        hidden_size=hidden_size,
+                                        num_layers=num_layers)      
 
         self.projection = nn.Linear(in_features=hidden_size, out_features=output_size)
 
@@ -74,7 +75,7 @@ class Seq2Seq(nn.Module):
                                                                         and log_probs of shape (b, q_len, h), where b = batch_size,
                                                                         q_len = maximum question length,  h = hidden size
         """        
-        dec_state = dec_init_state        #(batch_size, hidden_size)
+        dec_state  = dec_init_state        #(num_layers, batch_size, hidden_size)
 
         q_emb = self.emb(qw_idxs)         # (batch_size, q_len, hidden_size)
 
@@ -82,10 +83,8 @@ class Seq2Seq(nn.Module):
         combined_decoder_outputs = []
 
         for q_t in torch.split(q_emb, split_size_or_sections=1, dim=1):         #(batch_size, 1, hidden_size)
-            q_t = q_t.squeeze(dim=1)                                            #(batch_size, hidden_size)
-            dec_state = self.decoder(q_t, dec_state)                            #(batch_size, hidden_size)
-            h_t, _ = dec_state
-            o_t = h_t 
+            o_t, dec_state = self.decoder(q_t, dec_state)                       #(batch_size, 1, hidden_size)
+            o_t = o_t.squeeze(1)                                                #(batch_size, hidden_size)
             combined_decoder_outputs.append(o_t)
     
         combined_decoder_outputs = torch.stack(combined_decoder_outputs, dim=1)       #(batch_size, q_len, hidden_size)

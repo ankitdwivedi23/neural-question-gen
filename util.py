@@ -560,7 +560,6 @@ def TeacherForce(model, word2idx_dict, idx2word_dict, cw_idx, qw_idx, device):
     _, dec_init_state = model.module.encode(cw_idx)
     
     prev_word = SOS
-    #h_t = dec_init_state[0].unsqueeze(0), dec_init_state[1].unsqueeze(0)
     h_t = dec_init_state
 
     t = 0
@@ -584,7 +583,6 @@ def evaluateRandomly(model, word2idx_dict, idx2word_dict, cw_idx, device):
     _, dec_init_state = model.module.encode(cw_idx)
 
     prev_word = SOS
-    #h_t = dec_init_state[0].unsqueeze(0), dec_init_state[1].unsqueeze(0)
     h_t = dec_init_state
 
     t = 0
@@ -675,7 +673,6 @@ def beamSearch(model, word2idx_dict, idx2word_dict, cw_idx, device, beam_size: i
 
     c_enc, dec_init_state = model.module.encode(cw_idx)     # (1, c_len, 2 * hidden_size)
 
-    #h_tm1 = dec_init_state[0].unsqueeze(0), dec_init_state[1].unsqueeze(0)
     h_tm1 = dec_init_state
     eos_id = word2idx_dict[EOS] 
     vocab_size = len(model.module.word_vectors)
