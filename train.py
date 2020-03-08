@@ -79,7 +79,7 @@ def main(args):
 
     # Get model
     log.info('Building model...')
-    model = Seq2SeqAttn(word_vectors=word_vectors,
+    model = Seq2Seq(word_vectors=word_vectors,
                     hidden_size=args.hidden_size,
                     output_size=vocab_size,
                     device=device)
