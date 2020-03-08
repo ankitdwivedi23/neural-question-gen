@@ -1,4 +1,7 @@
 """Top-level model classes.
+
+code adapted from:
+    > https://github.com/chrischute/squad
 """
 
 import layers
@@ -24,7 +27,7 @@ class Seq2Seq(nn.Module):
         device (string): 'cuda:0' or 'cpu'
         drop_prob (float): Dropout probability.
     """
-    def __init__(self, word_vectors, hidden_size, output_size, device, drop_prob=0.):
+    def __init__(self, word_vectors, hidden_size, output_size, device, drop_prob=0., num_layers=1):
         super(Seq2Seq, self).__init__()
 
         self.hidden_size = hidden_size
@@ -36,11 +39,12 @@ class Seq2Seq(nn.Module):
         
         self.encoder = layers.EncoderRNN(input_size=hidden_size,
                                      hidden_size=hidden_size,
-                                     num_layers=1,
+                                     num_layers=num_layers,
                                      drop_prob=drop_prob)
 
-        self.decoder = layers.DecoderRNNCell(input_size=hidden_size,
-                                            hidden_size=hidden_size)      
+        self.decoder = layers.DecoderRNN(input_size=hidden_size,
+                                        hidden_size=hidden_size,
+                                        num_layers=num_layers)      
 
         self.projection = nn.Linear(in_features=hidden_size, out_features=output_size)
 
@@ -74,7 +78,7 @@ class Seq2Seq(nn.Module):
                                                                         and log_probs of shape (b, q_len, h), where b = batch_size,
                                                                         q_len = maximum question length,  h = hidden size
         """        
-        dec_state = dec_init_state        #(batch_size, hidden_size)
+        dec_state  = dec_init_state        #(num_layers, batch_size, hidden_size)
 
         q_emb = self.emb(qw_idxs)         # (batch_size, q_len, hidden_size)
 
@@ -82,10 +86,8 @@ class Seq2Seq(nn.Module):
         combined_decoder_outputs = []
 
         for q_t in torch.split(q_emb, split_size_or_sections=1, dim=1):         #(batch_size, 1, hidden_size)
-            q_t = q_t.squeeze(dim=1)                                            #(batch_size, hidden_size)
-            dec_state = self.decoder(q_t, dec_state)                            #(batch_size, hidden_size)
-            h_t, _ = dec_state
-            o_t = h_t 
+            o_t, dec_state = self.decoder(q_t, dec_state)                       #(batch_size, 1, hidden_size)
+            o_t = o_t.squeeze(1)                                                #(batch_size, hidden_size)
             combined_decoder_outputs.append(o_t)
     
         combined_decoder_outputs = torch.stack(combined_decoder_outputs, dim=1)       #(batch_size, q_len, hidden_size)
@@ -197,7 +199,7 @@ class Seq2SeqAttn(nn.Module):
         device (string): 'cuda:0' or cpu
         drop_prob (float): Dropout probability.
     """
-    def __init__(self, word_vectors, hidden_size, output_size, device, drop_prob=0.):
+    def __init__(self, word_vectors, hidden_size, output_size, device, drop_prob=0., num_layers=1):
         super(Seq2SeqAttn, self).__init__()
 
         self.hidden_size = hidden_size
@@ -211,11 +213,12 @@ class Seq2SeqAttn(nn.Module):
 
         self.encoder = layers.EncoderRNN(input_size=hidden_size,
                                      hidden_size=hidden_size,
-                                     num_layers=1,
+                                     num_layers=num_layers,
                                      drop_prob=drop_prob)
 
-        self.decoder = layers.DecoderRNNCell(input_size=2*hidden_size,
-                                            hidden_size=hidden_size)
+        self.decoder = layers.DecoderRNN(input_size=2*hidden_size,
+                                        hidden_size=hidden_size,
+                                        num_layers=num_layers)
 
         self.att_projection = nn.Linear(in_features=2*hidden_size, out_features=hidden_size, bias=False)
         self.combined_output_projection = nn.Linear(in_features=3*hidden_size, out_features=hidden_size, bias=False)
@@ -256,7 +259,7 @@ class Seq2SeqAttn(nn.Module):
         """        
         # Initialize previous combined output vector o_{t-1} as zero
         batch_size = self.enc_hiddens.size(0)
-        o_prev = torch.zeros(batch_size, self.hidden_size, device=self.device)
+        o_prev = torch.zeros(batch_size, 1, self.hidden_size, device=self.device)
         
         enc_hiddens_proj = self.att_projection(self.enc_hiddens)
 
@@ -268,8 +271,7 @@ class Seq2SeqAttn(nn.Module):
         combined_decoder_outputs = []
 
         for q_t in torch.split(q_emb, split_size_or_sections=1, dim=1):         #(batch_size, 1, hidden_size)
-            q_t = q_t.squeeze(dim=1)
-            Ybar_t = torch.cat((q_t, o_prev), dim=1)
+            Ybar_t = torch.cat((q_t, o_prev), dim=-1)                           #(batch_size, 1, 2*hidden_size)
             dec_state, o_t, _ = self.step(
                 Ybar_t,
                 dec_state,
@@ -277,8 +279,8 @@ class Seq2SeqAttn(nn.Module):
             combined_decoder_outputs.append(o_t)
     
         combined_decoder_outputs = torch.stack(combined_decoder_outputs, dim=1)       #(batch_size, q_len, hidden_size)
-        logits = self.target_vocab_projection(combined_decoder_outputs)                   #(batch_size, q_len, output_size)
-        log_probs = F.log_softmax(logits, dim=-1)        #(batch_size, q_len, output_size)
+        logits = self.target_vocab_projection(combined_decoder_outputs)               #(batch_size, q_len, output_size)
+        log_probs = F.log_softmax(logits, dim=-1)                                     #(batch_size, q_len, output_size)
         return dec_state, log_probs
 
     
@@ -302,19 +304,19 @@ class Seq2SeqAttn(nn.Module):
                                 Not used outside of this function, simply returned for sanity check.
         """
         combined_output = None
-        dec_state = self.decoder(Ybar_t, dec_state)
-        dec_hidden, dec_cell = dec_state
-        e_t = torch.bmm(torch.unsqueeze(dec_hidden, dim=1), torch.transpose(enc_hiddens_proj, dim0=1, dim1=2)).squeeze(dim=1)
+        o_t, dec_state = self.decoder(Ybar_t, dec_state)                                            # o_t => (batch_size, 1, hidden_size)
+        e_t = torch.bmm(o_t, torch.transpose(enc_hiddens_proj, dim0=1, dim1=2)).squeeze(dim=1)      # e_t => (batch_size, c_len)
 
         # Set e_t to -inf where enc_masks has 0
         if self.enc_masks is not None:
             e_t.data.masked_fill_(self.enc_masks == 0, -float('inf'))
 
-        alpha_t = F.softmax(e_t, dim=-1)
-        a_t = torch.bmm(torch.unsqueeze(alpha_t, dim=1), self.enc_hiddens).squeeze(dim=1)
-        U_t = torch.cat((dec_hidden, a_t), dim=1)
-        V_t = self.combined_output_projection(U_t)
-        O_t = self.dropout(torch.tanh(V_t))
+        alpha_t = F.softmax(e_t, dim=-1)                                                            # alpha_t => (batch_size, c_len)
+        a_t = torch.bmm(torch.unsqueeze(alpha_t, dim=1), self.enc_hiddens).squeeze(dim=1)           # a_t => (batch_size, 2*hidden_size)
+        o_t = o_t.squeeze(1)                                                                        # o_t => (batch_size, hidden_size)
+        U_t = torch.cat((o_t, a_t), dim=-1)                                                         # U_t => (batch_size, 3*hidden_size)
+        V_t = self.combined_output_projection(U_t)                                                  # V_t => (batch_size, hidden_size) 
+        O_t = self.dropout(torch.tanh(V_t))                                                         # O_t => (batch_size, hidden_size) 
 
         combined_output = O_t
         return dec_state, combined_output, e_t

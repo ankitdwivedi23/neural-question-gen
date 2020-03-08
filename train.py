@@ -1,5 +1,10 @@
 """Train a model on SQuAD.
+
+code adapted from:
+    > https://github.com/chrischute/squad
 """
+
+from typing import Union
 
 import numpy as np
 import random
@@ -25,7 +30,27 @@ from tqdm import tqdm
 from ujson import load as json_load
 from util import collate_fn, SQuAD
 
-def main(args):
+def percentile(t: torch.tensor, q: float) -> Union[int, float]:
+    """
+    Return the ``q``-th percentile of the flattened input tensor's data.
+    
+    CAUTION:
+    * Needs PyTorch >= 1.1.0, as ``torch.kthvalue()`` is used.
+    * Values are not interpolated, which corresponds to
+    ``numpy.percentile(..., interpolation="nearest")``.
+    
+    :param t: Input tensor.
+    :param q: Percentile to compute, which must be between 0 and 100 inclusive.
+    :return: Resulting value (scalar).
+    """
+    # Note that ``kthvalue()`` works one-based, i.e. the first sorted value
+    # indeed corresponds to k=1, not k=0! Use float(q) instead of q directly,
+    # so that ``round()`` returns an integer, even if q is a np.float32.
+    k = 1 + round(.01 * float(q) * (t.numel() - 1))
+    result = t.view(-1).kthvalue(k)
+    return result
+
+def main(args):    
     # Set up logging and devices
     args.save_dir = util.get_save_dir(args.save_dir, args.name, training=True)
     log = util.get_logger(args.save_dir, args.name)
@@ -60,8 +85,7 @@ def main(args):
     model = Seq2Seq(word_vectors=word_vectors,
                     hidden_size=args.hidden_size,
                     output_size=vocab_size,
-                    device=device,
-                    drop_prob=args.drop_prob)
+                    device=device)
     model = nn.DataParallel(model, args.gpu_ids)
     if args.load_path:
         log.info(f'Loading checkpoint from {args.load_path}...')
@@ -113,18 +137,23 @@ def main(args):
         log.info(f'Starting epoch {epoch}...')
         with torch.enable_grad(), \
                 tqdm(total=len(train_loader.dataset)) as progress_bar:
-            for cw_idxs, cc_idxs, qw_idxs, qc_idxs, y1, y2, ids in train_loader:
+            for cw_idxs, re_cw_idxs, cc_idxs, qw_idxs, qc_idxs, y1, y2, ids in train_loader:
                 
                 train_iter += 1
 
                 # Setup for forward
-                cw_idxs = cw_idxs.to(device)
+                re_cw_idxs = re_cw_idxs.to(device)
                 qw_idxs = qw_idxs.to(device)
-                batch_size = cw_idxs.size(0)
+                batch_size = re_cw_idxs.size(0)
                 optimizer.zero_grad()
+                
+                #c_mask = torch.zeros_like(cw_idxs) != cw_idxs
+                #c_len = c_mask.sum(-1)
+                #p = percentile(c_len, 80)
+                #cw_idxs = cw_idxs[:,:p[0].item()]
 
                 # Forward
-                log_p = model(cw_idxs, qw_idxs)        #(batch_size, q_len, vocab_size)
+                log_p = model(re_cw_idxs, qw_idxs)        #(batch_size, q_len, vocab_size)
                 
                 log_p = log_p.contiguous().view(log_p.size(0) * log_p.size(1), log_p.size(2))
                 qw_idxs_target = qw_idxs[:, 1:]     # omitting leading `SOS`
@@ -167,6 +196,10 @@ def main(args):
 
                     train_time = time.time()
                     report_loss = report_tgt_words = report_examples = 0.
+
+                    #print(getWords(re_cw_idxs[batch_size-1].squeeze().tolist()))
+                    #print(getWords(qw_idxs[batch_size-1].squeeze().tolist()))
+                    #util.evaluateRandomly(model, word2Idx, Idx2Word, re_cw_idxs[batch_size-1].unsqueeze(0), device)
                 
                 # perform validation
                 if train_iter % args.valid_niter == 0:
@@ -177,10 +210,6 @@ def main(args):
 
                     cum_loss = cum_examples = cum_tgt_words = 0.
                     valid_num += 1
-
-                    print(getWords(cw_idxs[batch_size-1].squeeze().tolist()))
-                    print(getWords(qw_idxs[batch_size-1].squeeze().tolist()))
-                    util.evaluateRandomly(model, word2Idx, Idx2Word, cw_idxs[batch_size-1].unsqueeze(0), device)
 
                     print('begin validation ...', file=sys.stderr)
 
@@ -227,32 +256,6 @@ def main(args):
                 if epoch == args.num_epochs:
                     log.info('reached maximum number of epochs!')
                     exit(0)
-                            
-                """
-                steps_till_eval -= batch_size
-                if steps_till_eval <= 0:
-                    steps_till_eval = args.eval_steps
-
-                    # Evaluate and save checkpoint
-                    log.info(f'Evaluating at step {step}...')
-                    #print(getWords(cw_idxs[batch_size-1].squeeze().tolist()))
-                    #print(getWords(qw_idxs[batch_size-1].squeeze().tolist()))
-                    #util.TeacherForce(model, word2Idx, Idx2Word, cw_idxs[batch_size-1].unsqueeze(0), qw_idxs[batch_size-1].unsqueeze(0), device)
-                    #util.evaluateRandomly(model, word2Idx, Idx2Word, cw_idxs[batch_size-1].unsqueeze(0), device)
-
-                    #ema.assign(model)
-                    results = evaluate(model,
-                                       dev_loader,
-                                       device,
-                                       args.use_squad_v2)
-                    saver.save(step, model, results[args.metric_name], device)
-                    #ema.resume(model)
-
-                    # Log to console
-                    results_str = ', '.join(f'{k}: {v:05.2f}' for k, v in results.items())
-                    log.info(f'Dev {results_str}')
-                """
-
 
 def evaluate(model, data_loader, device, use_squad_v2):
     """ Evaluate on dev questions
@@ -272,9 +275,9 @@ def evaluate(model, data_loader, device, use_squad_v2):
 
     # no_grad() signals backend to throw away all gradients
     with torch.no_grad():
-        for cw_idxs, cc_idxs, qw_idxs, qc_idxs, y1, y2, ids in data_loader:
+        for cw_idxs, re_cw_idxs, cc_idxs, qw_idxs, qc_idxs, y1, y2, ids in data_loader:
             # Setup for forward
-            cw_idxs = cw_idxs.to(device)
+            re_cw_idxs = re_cw_idxs.to(device)
             qw_idxs = qw_idxs.to(device)
             batch_size = cw_idxs.size(0)
             

@@ -4,11 +4,8 @@ Usage:
     > source activate squad
     > python setup.py
 
-Pre-processing code adapted from:
-    > https://github.com/HKUST-KnowComp/R-Net/blob/master/prepro.py
-
-Author:
-    Chris Chute (chute@stanford.edu)
+code adapted from:
+    > https://github.com/chrischute/squad
 """
 
 import numpy as np
@@ -121,6 +118,8 @@ def process_file(filename, data_type, word_counter, char_counter):
                             char_counter[char] += 1
                     y1s, y2s = [], []
                     answer_texts = []
+                    min_answer_index = len(context_tokens) - 1
+                    max_answer_index = 0
                     for answer in qa["answers"]:
                         answer_text = answer["text"]
                         answer_start = answer['answer_start']
@@ -131,15 +130,25 @@ def process_file(filename, data_type, word_counter, char_counter):
                             if not (answer_end <= span[0] or answer_start >= span[1]):
                                 answer_span.append(idx)
                         y1, y2 = answer_span[0], answer_span[-1]
+                        min_answer_index = min(y1, min_answer_index)
+                        max_answer_index = max(y2, max_answer_index)
                         y1s.append(y1)
                         y2s.append(y2)
+                    
+                    min_context_index= max(0, min_answer_index - 10)
+                    max_context_index = min(len(context_tokens) - 1, max_answer_index + 10)
+
+                    #print(context_tokens[min_context_index:max_context_index+1])
+
                     example = {"context_tokens": context_tokens,
+                               "reduced_context_tokens": context_tokens[min_context_index:max_context_index+1],                    
                                "context_chars": context_chars,
                                "ques_tokens": ques_tokens,
                                "ques_chars": ques_chars,
                                "y1s": y1s,
                                "y2s": y2s,
                                "id": total}
+                    #print(example)
                     examples.append(example)
                     eval_examples[str(total)] = {"context": context,
                                                  "question": ques,
@@ -152,6 +161,7 @@ def process_file(filename, data_type, word_counter, char_counter):
                 break
 
         print(f"{len(examples)} questions in total")
+        print(examples[0])
     return examples, eval_examples
 
 
@@ -217,6 +227,7 @@ def convert_to_features(args, data, word2idx_dict, char2idx_dict, is_test):
         raise ValueError("Context/Questions lengths are over the limit")
 
     context_idxs = np.zeros([para_limit], dtype=np.int32)
+    reduced_context_idxs = np.zeros([para_limit], dtype=np.int32)
     context_char_idxs = np.zeros([para_limit, char_limit], dtype=np.int32)
     ques_idxs = np.zeros([ques_limit], dtype=np.int32)
     ques_char_idxs = np.zeros([ques_limit, char_limit], dtype=np.int32)
@@ -234,6 +245,9 @@ def convert_to_features(args, data, word2idx_dict, char2idx_dict, is_test):
 
     for i, token in enumerate(example["context_tokens"]):
         context_idxs[i] = _get_word(token)
+    
+    for i, token in enumerate(example["reduced_context_tokens"]):
+        reduced_context_idxs[i] = _get_word(token)
 
     for i, token in enumerate(example["ques_tokens"]):
         ques_idxs[i] = _get_word(token)
@@ -250,7 +264,7 @@ def convert_to_features(args, data, word2idx_dict, char2idx_dict, is_test):
                 break
             ques_char_idxs[i, j] = _get_char(char)
 
-    return context_idxs, context_char_idxs, ques_idxs, ques_char_idxs
+    return context_idxs, reduced_context_idxs, context_char_idxs, ques_idxs, ques_char_idxs
 
 
 def is_answerable(example):
@@ -279,6 +293,7 @@ def build_features(args, examples, data_type, out_file, word2idx_dict, char2idx_
     total_ = 0
     meta = {}
     context_idxs = []
+    reduced_context_idxs = []
     context_char_idxs = []
     ques_idxs = []
     ques_char_idxs = []
@@ -305,6 +320,7 @@ def build_features(args, examples, data_type, out_file, word2idx_dict, char2idx_
             return 1
 
         context_idx = np.zeros([para_limit], dtype=np.int32)
+        reduced_context_idx = np.zeros([para_limit], dtype=np.int32)
         context_char_idx = np.zeros([para_limit, char_limit], dtype=np.int32)
         ques_idx = np.zeros([ques_limit], dtype=np.int32)
         ques_char_idx = np.zeros([ques_limit, char_limit], dtype=np.int32)
@@ -312,6 +328,10 @@ def build_features(args, examples, data_type, out_file, word2idx_dict, char2idx_
         for i, token in enumerate(example["context_tokens"]):
             context_idx[i] = _get_word(token)
         context_idxs.append(context_idx)
+
+        for i, token in enumerate(example["reduced_context_tokens"]):
+            reduced_context_idx[i] = _get_word(token)
+        reduced_context_idxs.append(reduced_context_idx)
 
         for i, token in enumerate(example["ques_tokens"]):
             ques_idx[i] = _get_word(token)
@@ -340,8 +360,12 @@ def build_features(args, examples, data_type, out_file, word2idx_dict, char2idx_
         y2s.append(end)
         ids.append(example["id"])
 
+    print("Check!!!!!")
+    print(len(reduced_context_idxs))
+
     np.savez(out_file,
              context_idxs=np.array(context_idxs),
+             reduced_context_idxs=np.array(reduced_context_idxs),
              context_char_idxs=np.array(context_char_idxs),
              ques_idxs=np.array(ques_idxs),
              ques_char_idxs=np.array(ques_char_idxs),

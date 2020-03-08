@@ -1,3 +1,9 @@
+"""Test model on SQuAD
+
+code adapted from:
+    > https://github.com/chrischute/squad
+"""
+
 import csv
 import torch
 import torch.nn as nn
@@ -75,7 +81,7 @@ def main(args):
         gold_dict = json_load(fh)
     with torch.no_grad(), \
             tqdm(total=len(dataset)) as progress_bar:
-        for cw_idxs, cc_idxs, qw_idxs, qc_idxs, y1, y2, ids in data_loader:
+        for cw_idxs, re_cw_idxs, cc_idxs, qw_idxs, qc_idxs, y1, y2, ids in data_loader:
             # Setup for forward
             cw_idxs = cw_idxs.to(device)
             qw_idxs = qw_idxs.to(device)
