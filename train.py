@@ -1,4 +1,7 @@
 """Train a model on SQuAD.
+
+code adapted from:
+    > https://github.com/chrischute/squad
 """
 
 from typing import Union

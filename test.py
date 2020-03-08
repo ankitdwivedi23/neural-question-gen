@@ -1,3 +1,9 @@
+"""Test model on SQuAD
+
+code adapted from:
+    > https://github.com/chrischute/squad
+"""
+
 import csv
 import torch
 import torch.nn as nn

@@ -1,4 +1,7 @@
 """Utility classes and methods.
+
+code adapted from:
+    > https://github.com/chrischute/squad
 """
 import logging
 import os

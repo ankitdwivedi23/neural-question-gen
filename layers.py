@@ -1,4 +1,7 @@
 """Assortment of layers for use in models.py.
+
+code adapted from:
+    > https://github.com/chrischute/squad
 """
 
 import torch

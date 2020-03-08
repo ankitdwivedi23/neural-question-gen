@@ -1,4 +1,7 @@
 """Top-level model classes.
+
+code adapted from:
+    > https://github.com/chrischute/squad
 """
 
 import layers
