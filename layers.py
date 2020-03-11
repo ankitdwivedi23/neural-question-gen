@@ -166,3 +166,16 @@ class DecoderRNNCell(nn.Module):
     def forward(self, input, hidden):
         hidden = self.rnn(input, hidden)
         return hidden
+
+class Generator(nn.Module):
+    """Define standard linear + softmax generation step.
+    Args:
+        d_model (int): Input dimension
+        vocab_size (int): Vocab size (output dimension)
+    """
+    def __init__(self, d_model, vocab_size):
+        super(Generator, self).__init__()
+        self.proj = nn.Linear(d_model, vocab_size)
+
+    def forward(self, x):
+        return F.log_softmax(self.proj(x), dim=-1)

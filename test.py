@@ -15,7 +15,7 @@ import json
 from args import get_test_args
 from collections import OrderedDict
 from json import dumps
-from models import Seq2Seq, Seq2SeqAttn
+from models import Seq2Seq, Seq2SeqAttn, TransformerModel
 from os.path import join
 from tensorboardX import SummaryWriter
 from tqdm import tqdm
@@ -40,6 +40,7 @@ def main(args):
     log.info('Loading word2Idx...')
     word2Idx = json.loads(open(args.word2idx_file).read())
     Idx2Word = {v: k for (k,v) in word2Idx.items()}
+    vocab_size = len(word2Idx)
 
     def getWords(idxList):
         words = []
@@ -47,13 +48,25 @@ def main(args):
             words.append(Idx2Word[i])
         return words
 
+    def create_new_model():
+        if args.model_type == "seq2seq":
+            return Seq2Seq(word_vectors=word_vectors,
+                    hidden_size=args.hidden_size,
+                    output_size=vocab_size,
+                    device=device)
+        elif args.model_type == "seq2seq_attn":
+            return Seq2SeqAttn(word_vectors=word_vectors,
+                    hidden_size=args.hidden_size,
+                    output_size=vocab_size,
+                    device=device)
+        elif args.model_type == "transformer":
+            return TransformerModel(vocab_size, device)
+
     # Get model
     log.info('Building model...')
-    model = Seq2Seq(word_vectors=word_vectors,
-                  hidden_size=args.hidden_size,
-                  output_size=len(word2Idx),
-                  device=device)
+    model = create_new_model()
     model = nn.DataParallel(model, gpu_ids)
+
     log.info(f'Loading checkpoint from {args.load_path}...')
     model = util.load_model(model, args.load_path, gpu_ids, return_step=False)
     model = model.to(device)

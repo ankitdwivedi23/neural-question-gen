@@ -148,20 +148,20 @@ def process_file(filename, data_type, word_counter, char_counter):
                                "y1s": y1s,
                                "y2s": y2s,
                                "id": total}
-                    #print(example)
+
                     examples.append(example)
                     eval_examples[str(total)] = {"context": context,
                                                  "question": ques,
                                                  "spans": spans,
                                                  "answers": answer_texts,
                                                  "uuid": qa["id"]}
-            if (data_type == 'train' and total >=500) or \
-            (data_type == 'dev' and total >=50) or \
-            (data_type == 'test' and total >=50):
+                    break
+            if (data_type == 'train' and total >=20) or \
+            (data_type == 'dev' and total >=20) or \
+            (data_type == 'test' and total >=20):
                 break
 
         print(f"{len(examples)} questions in total")
-        print(examples[0])
     return examples, eval_examples
 
 

@@ -24,7 +24,7 @@ import os
 from args import get_train_args
 from collections import OrderedDict
 from json import dumps
-from models import Seq2Seq, Seq2SeqAttn
+from models import Seq2Seq, Seq2SeqAttn, TransformerModel
 from tensorboardX import SummaryWriter
 from tqdm import tqdm
 from ujson import load as json_load
@@ -79,14 +79,26 @@ def main(args):
         for i in idxList:
             words.append(Idx2Word[i])
         return words
-
-    # Get model
-    log.info('Building model...')
-    model = Seq2Seq(word_vectors=word_vectors,
+    
+    def create_new_model():
+        if args.model_type == "seq2seq":
+            return Seq2Seq(word_vectors=word_vectors,
                     hidden_size=args.hidden_size,
                     output_size=vocab_size,
                     device=device)
+        elif args.model_type == "seq2seq_attn":
+            return Seq2SeqAttn(word_vectors=word_vectors,
+                    hidden_size=args.hidden_size,
+                    output_size=vocab_size,
+                    device=device)
+        elif args.model_type == "transformer":
+            return TransformerModel(vocab_size, device)
+
+    # Get model
+    log.info('Building model...')
+    model = create_new_model()    
     model = nn.DataParallel(model, args.gpu_ids)
+
     if args.load_path:
         log.info(f'Loading checkpoint from {args.load_path}...')
         model, step = util.load_model(model, args.load_path, args.gpu_ids)
@@ -147,20 +159,23 @@ def main(args):
                 batch_size = re_cw_idxs.size(0)
                 optimizer.zero_grad()
                 
-                #c_mask = torch.zeros_like(cw_idxs) != cw_idxs
-                #c_len = c_mask.sum(-1)
-                #p = percentile(c_len, 80)
-                #cw_idxs = cw_idxs[:,:p[0].item()]
+                c_mask = torch.zeros_like(re_cw_idxs) != re_cw_idxs
+                q_mask = torch.zeros_like(qw_idxs) != qw_idxs
 
                 # Forward
-                log_p = model(re_cw_idxs, qw_idxs)        #(batch_size, q_len, vocab_size)
+
+                if args.model_type in ['seq2seq', 'seq2seq_attn']:
+                    log_p = model(re_cw_idxs, qw_idxs)                  #(batch_size, q_len, vocab_size)
+                elif args.model_type == 'transformer':
+                    log_p = model(re_cw_idxs, qw_idxs, c_mask, q_mask)  #(batch_size, q_len, vocab_size)
                 
                 log_p = log_p.contiguous().view(log_p.size(0) * log_p.size(1), log_p.size(2))
-                qw_idxs_target = qw_idxs[:, 1:]     # omitting leading `SOS`
-                qw_idxs_target = qw_idxs_target.contiguous().view(qw_idxs_target.size(0) * qw_idxs_target.size(1))
-                q_mask = torch.zeros_like(qw_idxs_target) != qw_idxs_target
-                q_len = q_mask.sum(-1)
-                batch_loss = F.nll_loss(log_p, qw_idxs_target, ignore_index=0, reduction='sum')
+                qw_idxs_tgt = qw_idxs[:, 1:]     # omitting leading `SOS`
+                qw_idxs = qw_idxs.contiguous().view(qw_idxs.size(0) * qw_idxs.size(1))
+                qw_idxs_tgt = qw_idxs_tgt.contiguous().view(qw_idxs_tgt.size(0) * qw_idxs_tgt.size(1))
+                q_tgt_mask = torch.zeros_like(qw_idxs_tgt) != qw_idxs_tgt
+                q_len = q_tgt_mask.sum(-1)
+                batch_loss = F.nll_loss(log_p, qw_idxs_tgt, ignore_index=0, reduction='sum')
                 loss = batch_loss / batch_size
                 loss_val = loss.item()
 
@@ -173,7 +188,7 @@ def main(args):
                 report_loss += batch_loss_val
                 cum_loss += batch_loss_val
 
-                tgt_words_num_to_predict = torch.sum(q_len).item()  # omitting leading `<s>`
+                tgt_words_num_to_predict = torch.sum(q_len).item()
                 report_tgt_words += tgt_words_num_to_predict
                 cum_tgt_words += tgt_words_num_to_predict
                 report_examples += batch_size
