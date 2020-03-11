@@ -47,7 +47,7 @@ class Seq2Seq(nn.Module):
                                         hidden_size=hidden_size,
                                         num_layers=num_layers)      
 
-        self.projection = nn.Linear(in_features=hidden_size, out_features=output_size)
+        self.generator = layers.Generator(hidden_size, output_size)
 
 
     def forward(self, cw_idxs, qw_idxs):
@@ -92,8 +92,7 @@ class Seq2Seq(nn.Module):
             combined_decoder_outputs.append(o_t)
     
         combined_decoder_outputs = torch.stack(combined_decoder_outputs, dim=1)       #(batch_size, q_len, hidden_size)
-        logits = self.projection(combined_decoder_outputs)                   #(batch_size, q_len, output_size)
-        log_probs = F.log_softmax(logits, dim=-1)        #(batch_size, q_len, output_size)
+        log_probs = self.generator(combined_decoder_outputs)       #(batch_size, q_len, output_size)
         return dec_state, log_probs        
 
 ##################################################################################################################
@@ -137,7 +136,7 @@ class Seq2SeqAttn(nn.Module):
 
         self.att_projection = nn.Linear(in_features=2*hidden_size, out_features=hidden_size, bias=False)
         self.combined_output_projection = nn.Linear(in_features=3*hidden_size, out_features=hidden_size, bias=False)
-        self.target_vocab_projection = nn.Linear(in_features=hidden_size, out_features=output_size, bias=False)
+        self.generator = layers.Generator(hidden_size, output_size)
         self.dropout = nn.Dropout(p=drop_prob)
     
     
@@ -194,8 +193,7 @@ class Seq2SeqAttn(nn.Module):
             combined_decoder_outputs.append(o_t)
     
         combined_decoder_outputs = torch.stack(combined_decoder_outputs, dim=1)       #(batch_size, q_len, hidden_size)
-        logits = self.target_vocab_projection(combined_decoder_outputs)               #(batch_size, q_len, output_size)
-        log_probs = F.log_softmax(logits, dim=-1)                                     #(batch_size, q_len, output_size)
+        log_probs = self.generator(combined_decoder_outputs)                                    #(batch_size, q_len, output_size)
         return dec_state, log_probs
 
     
