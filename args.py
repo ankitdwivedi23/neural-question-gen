@@ -226,6 +226,10 @@ def add_common_args(parser):
 
 def add_train_test_args(parser):
     """Add arguments common to train.py and test.py"""
+    parser.add_argument('--model_type',
+                        type=str,
+                        default='seq2seq',
+                        help='Model type')
     parser.add_argument('--name',
                         '-n',
                         type=str,
