@@ -175,11 +175,7 @@ def main(args):
 
                 # Forward
                 if args.model_type == 'seq2seqGru':
-                    log_p = 0.
-                    batch_size = 0
-                    for cw_idx, qw_idx in zip(torch.split(re_cw_idxs, split_size_or_sections=1, dim=0), torch.split(qw_idxs, split_size_or_sections=1, dim=0)):
-                        log_p += model(cw_idx, qw_idx)
-                        batch_size += 1
+                    log_p = model(re_cw_idxs, qw_idxs)
                 elif args.model_type in ['seq2seq', 'seq2seq_attn']:
                     log_p = model(re_cw_idxs, qw_idxs)                  #(batch_size, q_len, vocab_size)
                 elif args.model_type == 'transformer':
@@ -239,7 +235,7 @@ def main(args):
                     #print(getWords(qw_idxs[batch_size-1].squeeze().tolist()))
                     #util.evaluateRandomly(model, word2Idx, Idx2Word, re_cw_idxs[batch_size-1].unsqueeze(0), device)
                 
-                '''
+                
                 # perform validation
                 if train_iter % args.valid_niter == 0:
                     log.info('epoch %d, iter %d, cum. loss %.2f, cum. ppl %.2f cum. examples %d' % (epoch, train_iter,
@@ -263,7 +259,7 @@ def main(args):
                         saver.save(step, model, results[args.metric_name], device)
 
                         # also save the optimizers' state
-                        torch.save(optimizer.state_dict(), model_save_path + '.optim')
+                        # torch.save(optimizer.state_dict(), model_save_path + '.optim')
                     
                     elif patience < args.patience_limit:
                         patience += 1
@@ -277,13 +273,13 @@ def main(args):
                                 exit(0)
 
                             # decay lr, and restore from previously best checkpoint
-                            lr = optimizer.param_groups[0]['lr'] * args.lr_decay
+                            # lr = optimizer.param_groups[0]['lr'] * args.lr_decay
                             log.info('load previously best model and decay learning rate to %f' % lr)
 
                             model, step = util.load_model(model, model_save_path, args.gpu_ids)
 
                             log.info('restore parameters of the optimizers')
-                            optimizer.load_state_dict(torch.load(model_save_path + '.optim'))
+                            # optimizer.load_state_dict(torch.load(model_save_path + '.optim'))
 
                             # set new lr
                             for param_group in optimizer.param_groups:
@@ -291,7 +287,7 @@ def main(args):
 
                             # reset patience
                             patience = 0
-                '''
+                
                 if epoch == args.num_epochs:
                     log.info('reached maximum number of epochs!')
                     exit(0)
@@ -313,31 +309,33 @@ def evaluate(model, data_loader, device, use_squad_v2):
     cum_tgt_words = 0.
 
     # no_grad() signals backend to throw away all gradients
-    with torch.no_grad():
-        for cw_idxs, re_cw_idxs, cc_idxs, qw_idxs, qc_idxs, y1, y2, ids in data_loader:
-            # Setup for forward
-            re_cw_idxs = re_cw_idxs.to(device)
-            qw_idxs = qw_idxs.to(device)
-            batch_size = re_cw_idxs.size(0)
+    #with torch.no_grad():
+    for cw_idxs, re_cw_idxs, cc_idxs, qw_idxs, qc_idxs, y1, y2, ids in data_loader:
+        # Setup for forward
+        re_cw_idxs = re_cw_idxs.to(device)
+        qw_idxs = qw_idxs.to(device)
+        batch_size = re_cw_idxs.size(0)
+        
+        # Forward
+        log_p = model(re_cw_idxs, qw_idxs)        #(batch_size, q_len, vocab_size)
             
-            # Forward
-            log_p = model(re_cw_idxs, qw_idxs)        #(batch_size, q_len, vocab_size)
-                
-            log_p = log_p.contiguous().view(log_p.size(0) * log_p.size(1), log_p.size(2))
-            qw_idxs_target = qw_idxs[:, 1:]     # omitting leading `SOS`
-            qw_idxs_target = qw_idxs_target.contiguous().view(qw_idxs_target.size(0) * qw_idxs_target.size(1))
-            loss = F.nll_loss(log_p, qw_idxs_target, ignore_index=0, reduction='sum')
-            nll_meter.update(loss.item(), batch_size)
+        #log_p = log_p.contiguous().view(log_p.size(0) * log_p.size(1), log_p.size(2))
+        qw_idxs_target = qw_idxs[:, 1:]     # omitting leading `SOS`
+        qw_idxs_target = qw_idxs_target.contiguous().view(qw_idxs_target.size(0) * qw_idxs_target.size(1))
+        #loss = F.nll_loss(log_p, qw_idxs_target, ignore_index=0, reduction='sum')
+        #nll_meter.update(loss.item(), batch_size)
 
-            q_mask = torch.zeros_like(qw_idxs_target) != qw_idxs_target
-            q_len = q_mask.sum(-1)
+        nll_meter.update(log_p, batch_size)
 
-            # Calculate perplexity        
-            cum_loss += loss.item()
-            tgt_word_num_to_predict = torch.sum(q_len).item()
-            cum_tgt_words += tgt_word_num_to_predict
+        q_mask = torch.zeros_like(qw_idxs_target) != qw_idxs_target
+        q_len = q_mask.sum(-1)
 
-        ppl = np.exp(cum_loss / cum_tgt_words)
+        # Calculate perplexity        
+        cum_loss += log_p #loss.item()
+        tgt_word_num_to_predict = torch.sum(q_len).item()
+        cum_tgt_words += tgt_word_num_to_predict
+
+    ppl = np.exp(cum_loss / cum_tgt_words)
 
     results_list = [('NLL', nll_meter.avg), \
                 ('PPL', ppl)]
