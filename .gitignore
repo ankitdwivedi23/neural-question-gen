@@ -136,4 +136,5 @@ __pycache__
 .texpadtmp/
 data/
 save/
-data-full/
+minisample*/
+data-*/
