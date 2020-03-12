@@ -10,8 +10,100 @@ import torch.nn as nn
 import torch.nn.functional as F
 import layers
 import util
+import random
 
 from typing import List, Tuple, Dict, Set, Union
+
+
+class Seq2SeqGru(nn.Module):
+    """Baseline seq2seq model
+    Implements a basic seq2seq network (using GRU):
+        - Embedding layer: Embed word indices to get word vectors.
+        - Encoder layer: Encode the embedded sequence.
+        - Decoder layer: Decode the encoded sequence word by word.
+        - Output layer: Simple layer (e.g., fc + softmax) to get final outputs.
+    Args:
+        word_vectors (torch.Tensor): Pre-trained word vectors.
+        hidden_size (int): Number of features in the hidden state at each layer.
+        output_size(int): Number of logits for softmax layer (vocab size)
+        device (string): 'cuda:0' or 'cpu'
+        drop_prob (float): Dropout probability.
+    """
+    def __init__(self, word_vectors, hidden_size, output_size, device, drop_prob=0.2, learning_rate=0.5):
+        super(Seq2SeqGru, self).__init__()
+
+        self.hidden_size = hidden_size
+        self.output_size = output_size
+        self.device = device
+        self.word_vectors = word_vectors
+        self.model_type = 'seq2seqGru'
+        self.teacher_forcing_ratio = 0.5
+
+        self. criterion = nn.NLLLoss(reduction='sum')
+        self.encoder = layers.EncoderGRU(input_size=len(word_vectors),
+                                     hidden_size=hidden_size, device=self.device)
+
+        self.decoder = layers.DecoderGRU(hidden_size=hidden_size,
+                                        output_size=output_size, device=self.device)      
+        self.encoder_optimizer = torch.optim.SGD(self.encoder.parameters(), lr=learning_rate)
+        self.decoder_optimizer = torch.optim.SGD(self.decoder.parameters(), lr=learning_rate)
+
+
+    def forward(self, cw_idx, qw_idx, max_length=3000):
+        SOS_token = 2
+        EOS_token = 3
+
+        encoder_hidden = self.encoder.initHidden()
+
+        self.encoder_optimizer.zero_grad()
+        self.decoder_optimizer.zero_grad()
+
+        input_tensor, target_tensor = cw_idx.permute(1,0), qw_idx.permute(1,0)
+
+        input_length = input_tensor.size(0)
+        target_length = target_tensor.size(0)
+
+        encoder_outputs = torch.zeros(max_length, self.encoder.hidden_size, device=self.device)
+
+        loss = 0
+
+        for ei in range(input_length):
+            encoder_output, encoder_hidden = self.encoder(input_tensor[ei], encoder_hidden)
+            encoder_outputs[ei] = encoder_output[0, 0]
+
+        decoder_input = torch.tensor([[SOS_token]], device=self.device)
+
+        decoder_hidden = encoder_hidden
+
+        use_teacher_forcing = True if random.random() < self.teacher_forcing_ratio else False
+
+        if use_teacher_forcing:
+            # Teacher forcing: Feed the target as the next input
+            for di in range(target_length):
+                decoder_output, decoder_hidden = self.decoder(decoder_input, decoder_hidden)
+                loss += self.criterion(decoder_output, target_tensor[di])
+                decoder_input = target_tensor[di]  # Teacher forcing
+
+        else:
+            # Without teacher forcing: use its own predictions as the next input
+            for di in range(target_length):
+                decoder_output, decoder_hidden = self.decoder(decoder_input, decoder_hidden)
+                topv, topi = decoder_output.topk(1)
+                decoder_input = topi.squeeze().detach()  # detach from history as input
+
+                loss += self.criterion(decoder_output, target_tensor[di])
+                if decoder_input.item() == EOS_token:
+                    break
+
+        loss.backward()
+
+        self.encoder_optimizer.step()
+        self.decoder_optimizer.step()
+
+        return loss.item() / target_length
+      
+
+##################################################################################################################
 
 class Seq2Seq(nn.Module):
     """Baseline seq2seq model
@@ -27,7 +119,7 @@ class Seq2Seq(nn.Module):
         device (string): 'cuda:0' or 'cpu'
         drop_prob (float): Dropout probability.
     """
-    def __init__(self, word_vectors, hidden_size, output_size, device, drop_prob=0., num_layers=1):
+    def __init__(self, word_vectors, hidden_size, output_size, device, drop_prob=0., num_layers=2):
         super(Seq2Seq, self).__init__()
 
         self.hidden_size = hidden_size

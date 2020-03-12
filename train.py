@@ -24,7 +24,7 @@ import os
 from args import get_train_args
 from collections import OrderedDict
 from json import dumps
-from models import Seq2Seq, Seq2SeqAttn, TransformerModel
+from models import Seq2SeqGru, Seq2Seq, Seq2SeqAttn, TransformerModel
 from tensorboardX import SummaryWriter
 from tqdm import tqdm
 from ujson import load as json_load
@@ -81,7 +81,12 @@ def main(args):
         return words
     
     def create_new_model():
-        if args.model_type == "seq2seq":
+        if args.model_type == "seq2seqGru":
+            return Seq2SeqGru(word_vectors=word_vectors,
+                    hidden_size=args.hidden_size,
+                    output_size=vocab_size,
+                    device=device)
+        elif args.model_type == "seq2seq":
             return Seq2Seq(word_vectors=word_vectors,
                     hidden_size=args.hidden_size,
                     output_size=vocab_size,
@@ -119,7 +124,13 @@ def main(args):
 
     # Get optimizer and scheduler    
     # Default project starter code uses Adadelta, but we're going to use Adam
-    optimizer = torch.optim.Adam(model.parameters(), lr=float(args.lr))
+    # optimizer = torch.optim.Adam(model.parameters(), lr=float(args.lr))
+
+    # Trying SGD Optimizer
+    # optimizer = torch.optim.SGD(model.parameters(), lr=float(args.lr))
+
+    # Loss Function
+    # loss_function = nn.NLLLoss(reduction='sum')
 
     num_trial = 0
     train_iter = patience = cum_loss = report_loss = cum_tgt_words = report_tgt_words = 0
@@ -152,30 +163,37 @@ def main(args):
             for cw_idxs, re_cw_idxs, cc_idxs, qw_idxs_original, qc_idxs, y1, y2, ids in train_loader:
                 
                 train_iter += 1
-                qw_idxs = qw_idxs_original[:, 0:2]
+                qw_idxs = cw_idxs[:, 0:2] #qw_idxs_original[:, 0:2]
                 # Setup for forward
                 re_cw_idxs = re_cw_idxs.to(device)
                 qw_idxs = qw_idxs.to(device)
                 batch_size = re_cw_idxs.size(0)
-                optimizer.zero_grad()
+                #optimizer.zero_grad()
                 
                 c_mask = torch.zeros_like(re_cw_idxs) != re_cw_idxs
                 q_mask = torch.zeros_like(qw_idxs) != qw_idxs
 
                 # Forward
-
-                if args.model_type in ['seq2seq', 'seq2seq_attn']:
+                if args.model_type == 'seq2seqGru':
+                    log_p = 0.
+                    for cw_idx, qw_idx in zip(torch.split(re_cw_idxs, split_size_or_sections=1, dim=0), torch.split(qw_idxs, split_size_or_sections=1, dim=0)):
+                        log_p += model(cw_idx, qw_idx)
+                elif args.model_type in ['seq2seq', 'seq2seq_attn']:
                     log_p = model(re_cw_idxs, qw_idxs)                  #(batch_size, q_len, vocab_size)
                 elif args.model_type == 'transformer':
                     log_p = model(re_cw_idxs, qw_idxs, c_mask, q_mask)  #(batch_size, q_len, vocab_size)
                 
+                '''
                 log_p = log_p.contiguous().view(log_p.size(0) * log_p.size(1), log_p.size(2))
                 qw_idxs_tgt = qw_idxs[:, 1:]     # omitting leading `SOS`
                 qw_idxs = qw_idxs.contiguous().view(qw_idxs.size(0) * qw_idxs.size(1))
                 qw_idxs_tgt = qw_idxs_tgt.contiguous().view(qw_idxs_tgt.size(0) * qw_idxs_tgt.size(1))
                 q_tgt_mask = torch.zeros_like(qw_idxs_tgt) != qw_idxs_tgt
                 q_len = q_tgt_mask.sum(-1)
-                batch_loss = F.nll_loss(log_p, qw_idxs_tgt, ignore_index=0, reduction='sum')
+                #print(log_p.size())
+                #print(qw_idxs_tgt.size())
+                #wait = input("Sab chill hai.. press to continue")
+                batch_loss = loss_function(log_p, qw_idxs_tgt)
                 loss = batch_loss / batch_size
                 loss_val = loss.item()
 
@@ -193,12 +211,12 @@ def main(args):
                 cum_tgt_words += tgt_words_num_to_predict
                 report_examples += batch_size
                 cum_examples += batch_size
-
+                '''
                 # Log info
                 step += batch_size
                 progress_bar.update(batch_size)
                 progress_bar.set_postfix(epoch=epoch,
-                                         NLL=loss_val)
+                                         NLL=log_p)
                 
                 if train_iter % args.log_every == 0:
                     log.info('epoch %d, iter %d, avg. loss %.2f, avg. ppl %.2f ' \
@@ -267,7 +285,7 @@ def main(args):
 
                             # reset patience
                             patience = 0
-
+                
                 if epoch == args.num_epochs:
                     log.info('reached maximum number of epochs!')
                     exit(0)
@@ -294,10 +312,10 @@ def evaluate(model, data_loader, device, use_squad_v2):
             # Setup for forward
             re_cw_idxs = re_cw_idxs.to(device)
             qw_idxs = qw_idxs.to(device)
-            batch_size = cw_idxs.size(0)
+            batch_size = re_cw_idxs.size(0)
             
             # Forward
-            log_p = model(cw_idxs, qw_idxs)        #(batch_size, q_len, vocab_size)
+            log_p = model(re_cw_idxs, qw_idxs)        #(batch_size, q_len, vocab_size)
                 
             log_p = log_p.contiguous().view(log_p.size(0) * log_p.size(1), log_p.size(2))
             qw_idxs_target = qw_idxs[:, 1:]     # omitting leading `SOS`

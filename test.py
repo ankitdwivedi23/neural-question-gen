@@ -99,11 +99,14 @@ def main(args):
             cw_idxs = cw_idxs.to(device)
             qw_idxs = qw_idxs.to(device)
             batch_size = cw_idxs.size(0)
-
+            print(batch_size)
             # Forward
-            for cw_idx, qw_idx_original in zip(torch.split(cw_idxs, split_size_or_sections=1, dim=0), torch.split(qw_idxs, split_size_or_sections=1, dim=0)):
+            for cw_idx, qw_idx_original in zip(torch.split(re_cw_idxs, split_size_or_sections=1, dim=0), torch.split(qw_idxs, split_size_or_sections=1, dim=0)):
                 #y = F.one_hot(qw_idx, num_classes=len(word_vectors))
-                qw_idx = qw_idx_original[:, 0:2]
+                print(cw_idx.size())
+                print(qw_idx_original.size())
+                qw_idx = cw_idx[:, 0:1] #qw_idx_original[:, 0:2]
+                print(qw_idx.size())
                 print(getWords(cw_idx.squeeze().tolist()))
                 print(getWords(qw_idx.squeeze().tolist()))
                 util.TeacherForce(model, word2Idx, Idx2Word, cw_idx, qw_idx, device)
