@@ -176,33 +176,38 @@ def main(args):
                 # Forward
                 if args.model_type == 'seq2seqGru':
                     log_p = 0.
+                    batch_size = 0
                     for cw_idx, qw_idx in zip(torch.split(re_cw_idxs, split_size_or_sections=1, dim=0), torch.split(qw_idxs, split_size_or_sections=1, dim=0)):
                         log_p += model(cw_idx, qw_idx)
+                        batch_size += 1
                 elif args.model_type in ['seq2seq', 'seq2seq_attn']:
                     log_p = model(re_cw_idxs, qw_idxs)                  #(batch_size, q_len, vocab_size)
                 elif args.model_type == 'transformer':
                     log_p = model(re_cw_idxs, qw_idxs, c_mask, q_mask)  #(batch_size, q_len, vocab_size)
                 
-                '''
-                log_p = log_p.contiguous().view(log_p.size(0) * log_p.size(1), log_p.size(2))
+                
+                #log_p = log_p.contiguous().view(log_p.size(0) * log_p.size(1), log_p.size(2))
                 qw_idxs_tgt = qw_idxs[:, 1:]     # omitting leading `SOS`
                 qw_idxs = qw_idxs.contiguous().view(qw_idxs.size(0) * qw_idxs.size(1))
                 qw_idxs_tgt = qw_idxs_tgt.contiguous().view(qw_idxs_tgt.size(0) * qw_idxs_tgt.size(1))
                 q_tgt_mask = torch.zeros_like(qw_idxs_tgt) != qw_idxs_tgt
                 q_len = q_tgt_mask.sum(-1)
+                
                 #print(log_p.size())
                 #print(qw_idxs_tgt.size())
                 #wait = input("Sab chill hai.. press to continue")
-                batch_loss = loss_function(log_p, qw_idxs_tgt)
+                batch_loss = log_p #loss_function(log_p, qw_idxs_tgt)
                 loss = batch_loss / batch_size
-                loss_val = loss.item()
+                #loss_val = loss.item()
 
+                '''
                 # Backward
                 loss.backward()
                 nn.utils.clip_grad_norm_(model.parameters(), args.max_grad_norm)
                 optimizer.step()
-                
-                batch_loss_val = batch_loss.item()
+                '''
+
+                batch_loss_val = batch_loss #batch_loss.item()
                 report_loss += batch_loss_val
                 cum_loss += batch_loss_val
 
@@ -211,7 +216,7 @@ def main(args):
                 cum_tgt_words += tgt_words_num_to_predict
                 report_examples += batch_size
                 cum_examples += batch_size
-                '''
+                
                 # Log info
                 step += batch_size
                 progress_bar.update(batch_size)
@@ -234,6 +239,7 @@ def main(args):
                     #print(getWords(qw_idxs[batch_size-1].squeeze().tolist()))
                     #util.evaluateRandomly(model, word2Idx, Idx2Word, re_cw_idxs[batch_size-1].unsqueeze(0), device)
                 
+                '''
                 # perform validation
                 if train_iter % args.valid_niter == 0:
                     log.info('epoch %d, iter %d, cum. loss %.2f, cum. ppl %.2f cum. examples %d' % (epoch, train_iter,
@@ -285,7 +291,7 @@ def main(args):
 
                             # reset patience
                             patience = 0
-                
+                '''
                 if epoch == args.num_epochs:
                     log.info('reached maximum number of epochs!')
                     exit(0)
