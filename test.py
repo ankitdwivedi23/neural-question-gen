@@ -101,12 +101,13 @@ def main(args):
             batch_size = cw_idxs.size(0)
 
             # Forward
-            for cw_idx, qw_idx in zip(torch.split(cw_idxs, split_size_or_sections=1, dim=0), torch.split(qw_idxs, split_size_or_sections=1, dim=0)):
+            for cw_idx, qw_idx_original in zip(torch.split(cw_idxs, split_size_or_sections=1, dim=0), torch.split(qw_idxs, split_size_or_sections=1, dim=0)):
                 #y = F.one_hot(qw_idx, num_classes=len(word_vectors))
-                #print(getWords(cw_idx.squeeze().tolist()))
-                #print(getWords(qw_idx.squeeze().tolist()))
-                #util.TeacherForce(model, word2Idx, Idx2Word, cw_idx, qw_idx, device)
-                #util.evaluateRandomly(model, word2Idx, Idx2Word, cw_idx, device)
+                qw_idx = qw_idx_original[:, 0:2]
+                print(getWords(cw_idx.squeeze().tolist()))
+                print(getWords(qw_idx.squeeze().tolist()))
+                util.TeacherForce(model, word2Idx, Idx2Word, cw_idx, qw_idx, device)
+                util.evaluateRandomly(model, word2Idx, Idx2Word, cw_idx, device)
 
                 hypotheses = util.beamSearch(model, word2Idx, Idx2Word, cw_idx, device)
                 loss = 0.
@@ -116,7 +117,7 @@ def main(args):
                     loss = loss + hyp.score
                     pred_dict[cw_idx].append(hyp.value)
                 nll_meter.update(loss, batch_size)
-                #wait = input("Sab chill hai.. press to continue")
+                wait = input("Sab chill hai.. press to continue")
 
                 cw_list.append(cw_idx)
                 qw_list.append(qw_idx)

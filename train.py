@@ -149,10 +149,10 @@ def main(args):
         log.info(f'Starting epoch {epoch}...')
         with torch.enable_grad(), \
                 tqdm(total=len(train_loader.dataset)) as progress_bar:
-            for cw_idxs, re_cw_idxs, cc_idxs, qw_idxs, qc_idxs, y1, y2, ids in train_loader:
+            for cw_idxs, re_cw_idxs, cc_idxs, qw_idxs_original, qc_idxs, y1, y2, ids in train_loader:
                 
                 train_iter += 1
-
+                qw_idxs = qw_idxs_original[:, 0:2]
                 # Setup for forward
                 re_cw_idxs = re_cw_idxs.to(device)
                 qw_idxs = qw_idxs.to(device)
