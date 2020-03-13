@@ -150,7 +150,7 @@ def main(args):
                     device=device)
         elif args.model_type == "transformer":
             #return TransformerModel(word_vectors, device)
-            return make_model(vocab_size, vocab_size)
+            return make_model(vocab_size, vocab_size, N=2, d_model=64, d_ff=256, h=4)
 
     # Get model
     log.info('Building model...')
@@ -211,10 +211,14 @@ def main(args):
                 
                 train_iter += 1
 
+                batch_size = re_cw_idxs.size(0)
+
                 # Setup for forward
                 re_cw_idxs = re_cw_idxs.to(device)
+                #re_cw_idxs = torch.cat((torch.zeros((batch_size, 1), device=device, dtype=torch.long), re_cw_idxs), dim=-1)
+                #re_cw_idxs[:,0] = 2
                 qw_idxs = qw_idxs.to(device)
-                batch_size = re_cw_idxs.size(0)
+
                 optimizer.zero_grad()
 
                 pad = 0
