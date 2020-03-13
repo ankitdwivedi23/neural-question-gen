@@ -332,7 +332,7 @@ def main(args):
                     model.eval()
                     predicted_words = util.greedy_decode(model, re_cw_idxs[0].unsqueeze(0), c_mask[0].unsqueeze(0), max_len=30, start_symbol=2)
                     print(predicted_words)
-                    #print(getWords(predicted_words.squeeze().tolist()))
+                    print(getWords(predicted_words.squeeze().tolist()))
                     model.train()
 
 
