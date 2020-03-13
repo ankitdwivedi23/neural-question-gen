@@ -30,6 +30,56 @@ from tqdm import tqdm
 from ujson import load as json_load
 from util import collate_fn, SQuAD
 
+from transformer import make_model, make_std_mask
+
+
+class NoamOpt:
+    "Optim wrapper that implements rate."
+    def __init__(self, model_size, factor, warmup, optimizer):
+        self.optimizer = optimizer
+        self._step = 0
+        self.warmup = warmup
+        self.factor = factor
+        self.model_size = model_size
+        self._rate = 0
+        
+    def step(self):
+        "Update parameters and rate"
+        self._step += 1
+        rate = self.rate()
+        for p in self.optimizer.param_groups:
+            p['lr'] = rate
+        self._rate = rate
+        self.optimizer.step()
+        
+    def rate(self, step = None):
+        "Implement `lrate` above"
+        if step is None:
+            step = self._step
+        return self.factor * \
+            (self.model_size ** (-0.5) *
+            min(step ** (-0.5), step * self.warmup ** (-1.5)))
+
+
+class SimpleLossCompute:
+    "A simple loss compute and train function."
+    def __init__(self, criterion, opt=None):
+        self.criterion = criterion
+        self.opt = opt
+        
+    def __call__(self, x, y, norm):
+        x = x.contiguous().view(-1, x.size(-1))
+        y = y.contiguous().view(-1)
+
+        loss = self.criterion(x, y) / norm
+        loss.backward()
+
+        if self.opt is not None:
+            self.opt.step()
+            self.opt.optimizer.zero_grad()
+        return loss.item() * norm
+
+
 def percentile(t: torch.tensor, q: float) -> Union[int, float]:
     """
     Return the ``q``-th percentile of the flattened input tensor's data.
@@ -72,7 +122,14 @@ def main(args):
     log.info('Loading word2Idx...')
     word2Idx = json.loads(open(args.word2idx_file).read())
     Idx2Word = {v: k for (k,v) in word2Idx.items()}
+    #for idx in [2251, 1280,  724,   19,   27,  338, 1733,   28, 1415,    9,  163,  4, 1062,    4,    7, 2409,    4,   32,  124,   32,  873, 1888, 7, 2107, 5,  217]:
+    #    print(Idx2Word[idx])
+    print("2251 is ...")
+    print(Idx2Word[2251])
+        
+
     vocab_size = len(word2Idx)
+    print(f"Vocab Size is : {vocab_size}")
 
     def getWords(idxList):
         words = []
@@ -92,7 +149,8 @@ def main(args):
                     output_size=vocab_size,
                     device=device)
         elif args.model_type == "transformer":
-            return TransformerModel(vocab_size, device)
+            #return TransformerModel(word_vectors, device)
+            return make_model(vocab_size, vocab_size)
 
     # Get model
     log.info('Building model...')
@@ -158,41 +216,69 @@ def main(args):
                 qw_idxs = qw_idxs.to(device)
                 batch_size = re_cw_idxs.size(0)
                 optimizer.zero_grad()
-                
-                c_mask = torch.zeros_like(re_cw_idxs) != re_cw_idxs
-                q_mask = torch.zeros_like(qw_idxs) != qw_idxs
+
+                pad = 0
+
+                c_mask = (re_cw_idxs != pad).unsqueeze(-2)
+                q_mask = make_std_mask(re_cw_idxs, pad)
 
                 # Forward
 
                 if args.model_type in ['seq2seq', 'seq2seq_attn']:
                     log_p = model(re_cw_idxs, qw_idxs)                  #(batch_size, q_len, vocab_size)
                 elif args.model_type == 'transformer':
-                    log_p = model(re_cw_idxs, qw_idxs, c_mask, q_mask)  #(batch_size, q_len, vocab_size)
+                    log_p = model(re_cw_idxs, re_cw_idxs, c_mask, q_mask)           #(batch_size, q_len, vocab_size)
                 
+                #print(qw_idxs[0])
+                #print(log_p[0].argmax(-1))
+                #print(log_p.shape)
+
                 log_p = log_p.contiguous().view(log_p.size(0) * log_p.size(1), log_p.size(2))
-                qw_idxs_tgt = qw_idxs[:, 1:]     # omitting leading `SOS`
-                qw_idxs = qw_idxs.contiguous().view(qw_idxs.size(0) * qw_idxs.size(1))
+                #print(log_p.shape)
+                #qw_idxs_tgt = qw_idxs[:, 1:]     # omitting leading `SOS`
+                qw_idxs_tgt = re_cw_idxs
+                #print(qw_idxs_tgt.shape)
                 qw_idxs_tgt = qw_idxs_tgt.contiguous().view(qw_idxs_tgt.size(0) * qw_idxs_tgt.size(1))
+                #print(qw_idxs_tgt.shape)
                 q_tgt_mask = torch.zeros_like(qw_idxs_tgt) != qw_idxs_tgt
                 q_len = q_tgt_mask.sum(-1)
-                batch_loss = F.nll_loss(log_p, qw_idxs_tgt, ignore_index=0, reduction='sum')
-                loss = batch_loss / batch_size
-                loss_val = loss.item()
+                
+                #batch_loss = F.nll_loss(log_p, qw_idxs_tgt, ignore_index=0, reduction='sum')
+
+                criterion = nn.NLLLoss(ignore_index=0, reduction='sum')
+                model_opt = NoamOpt(model.module.src_embed[0].d_model, 1, 400,
+                                    torch.optim.Adam(model.parameters(), lr=0, betas=(0.9, 0.98), eps=1e-9))                
+
+                #loss = batch_loss / batch_size
+                #loss_val = loss.item()
 
                 # Backward
-                loss.backward()
-                nn.utils.clip_grad_norm_(model.parameters(), args.max_grad_norm)
-                optimizer.step()
+                #loss.backward()
+                #nn.utils.clip_grad_norm_(model.parameters(), args.max_grad_norm)
+                #optimizer.step()
                 
-                batch_loss_val = batch_loss.item()
-                report_loss += batch_loss_val
-                cum_loss += batch_loss_val
-
                 tgt_words_num_to_predict = torch.sum(q_len).item()
+                #print(f"Num of words: {tgt_words_num_to_predict}")
                 report_tgt_words += tgt_words_num_to_predict
                 cum_tgt_words += tgt_words_num_to_predict
-                report_examples += batch_size
+                #report_examples += batch_size
                 cum_examples += batch_size
+
+                loss_compute = SimpleLossCompute(criterion, model_opt)
+                loss_val = loss_compute(log_p, qw_idxs_tgt, tgt_words_num_to_predict)
+                
+                '''
+                print("GRAD:")
+                print(f'cw_idxs: {cw_idxs.requires_grad}')
+                print(f'qw_idxs_tgt: {qw_idxs_tgt.requires_grad}')
+                print(f'log_p: {log_p.requires_grad}')
+                print(f're_cw_idxs: {re_cw_idxs.requires_grad}')
+                print(f'q_tgt_mask: {q_tgt_mask.requires_grad}')
+                '''
+
+                #batch_loss_val = batch_loss.item()
+                #report_loss += loss_val
+                cum_loss += loss_val
 
                 # Log info
                 step += batch_size
@@ -201,10 +287,20 @@ def main(args):
                                          NLL=loss_val)
                 
                 if train_iter % args.log_every == 0:
+                    '''
                     log.info('epoch %d, iter %d, avg. loss %.2f, avg. ppl %.2f ' \
                       'cum. examples %d, speed %.2f words/sec, time elapsed %.2f sec' % (epoch, train_iter,
                                                                                          report_loss / report_examples,
                                                                                          math.exp(report_loss / report_tgt_words),
+                                                                                         cum_examples,
+                                                                                         report_tgt_words / (time.time() - train_time),
+                                                                                         time.time() - begin_time))
+                    '''
+
+                    log.info('epoch %d, iter %d, avg. loss %.2f, avg. ppl %.2f ' \
+                      'cum. examples %d, speed %.2f words/sec, time elapsed %.2f sec' % (epoch, train_iter,
+                                                                                         loss_val / tgt_words_num_to_predict,
+                                                                                         math.exp(loss_val / tgt_words_num_to_predict),
                                                                                          cum_examples,
                                                                                          report_tgt_words / (time.time() - train_time),
                                                                                          time.time() - begin_time))
@@ -217,6 +313,7 @@ def main(args):
                     #util.evaluateRandomly(model, word2Idx, Idx2Word, re_cw_idxs[batch_size-1].unsqueeze(0), device)
                 
                 # perform validation
+                '''
                 if train_iter % args.valid_niter == 0:
                     log.info('epoch %d, iter %d, cum. loss %.2f, cum. ppl %.2f cum. examples %d' % (epoch, train_iter,
                                                                                             cum_loss / cum_examples,
@@ -271,6 +368,7 @@ def main(args):
                 if epoch == args.num_epochs:
                     log.info('reached maximum number of epochs!')
                     exit(0)
+                '''
 
 def evaluate(model, data_loader, device, use_squad_v2):
     """ Evaluate on dev questions

@@ -4,6 +4,7 @@ code adapted from:
     > https://github.com/chrischute/squad
 """
 
+import math
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -179,3 +180,15 @@ class Generator(nn.Module):
 
     def forward(self, x):
         return F.log_softmax(self.proj(x), dim=-1)
+
+
+class TransformerEmbedding(nn.Module):
+    def __init__(self, word_vectors, d_model, padding_idx):
+        super(TransformerEmbedding, self).__init__()
+        #self.lut = nn.Embedding(vocab, d_model, padding_idx)
+        self.d_model = d_model
+        self.emb = nn.Embedding.from_pretrained(word_vectors, freeze=True, padding_idx=padding_idx)
+        self.proj = nn.Linear(word_vectors.size(1), d_model, bias=False)
+
+    def forward(self, x):
+        return self.proj(self.emb(x)) * math.sqrt(self.d_model)

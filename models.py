@@ -257,18 +257,21 @@ class TransformerModel(nn.Module):
         dim_feedforward (int): Dimension of the feedforward network model
         dropout (float): Dropout probability
     """
-    def __init__(self, vocab_size, device, d_model=512, nhead=8, num_encoder_layers=6, num_decoder_layers=6, dim_feedforward=2048, dropout=0.1):
+    def __init__(self, word_vectors, device, d_model=512, nhead=8, num_encoder_layers=6, num_decoder_layers=6, dim_feedforward=2048, dropout=0.1):
         super(TransformerModel, self).__init__()
         self.device = device
-        self.emb = nn.Embedding(num_embeddings=vocab_size, embedding_dim=d_model, padding_idx=0)
+        self.emb = layers.TransformerEmbedding(word_vectors, d_model, padding_idx=0)
+        #self.emb = nn.Embedding(num_embeddings=vocab_size, embedding_dim=d_model, padding_idx=0)
         self.encoder_layer = nn.TransformerEncoderLayer(d_model, nhead, dim_feedforward, dropout)
         self.encoder = nn.TransformerEncoder(self.encoder_layer, num_encoder_layers)
         self.decoder_layer = nn.TransformerDecoderLayer(d_model, nhead, dim_feedforward)
         self.decoder = nn.TransformerDecoder(self.decoder_layer, num_decoder_layers)
-        self.generator = layers.Generator(d_model, vocab_size)
+        self.generator = layers.Generator(d_model, word_vectors.size(0))
         self.model_type = 'transformer'
+
+        self._reset_parameters()
     
-    def forward(self, cw_idxs, qw_idxs, c_mask, q_mask):
+    def forward(self, cw_idxs, qw_idxs):
         """
         Args:
             cw_idxs (tensor): Padded context sequence. Shape: (batch_size, c_len)
@@ -278,29 +281,38 @@ class TransformerModel(nn.Module):
         Returns:
             log_p (tensor): log of softmax distribution of linear projection of decoder output. Shape: 
         """
+        # Chop of the EOS token.
+        #qw_idxs = qw_idxs[:, :-1]
+        #q_mask = q_mask[:, :-1]
+
+        #print("Context:")
+        #print(cw_idxs)
+
+        #print("Target:")
+        #print(qw_idxs)
+
+        c_mask = torch.zeros_like(cw_idxs) == cw_idxs
+
         enc_out = self.encode(cw_idxs, c_mask)      # (batch_size, c_len, d_model)
-        log_p = self.decode(qw_idxs, enc_out, c_mask, q_mask)       # (batch_size, q_len, vocab_size)
+        log_p = self.decode(qw_idxs, enc_out, c_mask)       # (batch_size, q_len, vocab_size)
         return log_p    
 
     def encode(self, cw_idxs, c_mask):
         c_emb = self.emb(cw_idxs)                   # (batch_size, c_len, d_model)
         c_emb = c_emb.transpose(0,1)                # (c_len, batch_size, d_model)
 
-        c_mask = c_mask.to(dtype=torch.uint8)       # (batch_size, c_len)
+        #c_mask = c_mask.to(dtype=torch.uint8)       # (batch_size, c_len)
 
         enc_out = self.encoder(c_emb, src_key_padding_mask=c_mask)    # (batch_size, c_len, d_model)
         return enc_out
     
-    def decode(self, qw_idxs, enc_out, c_mask, q_mask=None):
+    def decode(self, qw_idxs, enc_out, c_mask):
+        q_mask = torch.zeros_like(qw_idxs) == qw_idxs
         q_emb = self.emb(qw_idxs)                   # (batch_size, q_len, d_model)
         q_emb = q_emb.transpose(0,1)                # (q_len, batch_size, d_model)
 
-        c_mask = c_mask.to(dtype=torch.uint8)       # (batch_size, c_len) 
-        self_attn_mask = None        
-
-        if q_mask is not None:
-            self_attn_mask = self.generate_square_subsequent_mask(q_mask.size(1)).to(device=self.device)    # (q_len, q_len)
-            q_mask = q_mask.to(dtype=torch.uint8)                                                           # (batch_size, q_len)
+        #c_mask = c_mask.to(dtype=torch.uint8)       # (batch_size, c_len) 
+        self_attn_mask = self.generate_square_subsequent_mask(q_mask.size(1)).to(device=self.device)    # (q_len, q_len)
 
         dec_out = self.decoder(
             tgt=q_emb,
@@ -309,13 +321,37 @@ class TransformerModel(nn.Module):
             tgt_key_padding_mask=q_mask,
             memory_key_padding_mask=c_mask)     # (q_len, batch_size, d_model)
         log_p = self.generator(dec_out)         # (q_len, batch_size, vocab_size)
-        return log_p.transpose(0,1)             # (batch_size, q_len, vocab_size)
+        
+        '''
+        enc_out = enc_out.transpose(0,1)
+        print("Encoder Output...")
+        print(enc_out[7][0])
+
+        dec_out = dec_out.transpose(0,1)        
+        print("Decoder Output...")
+        print(dec_out[7][0])
+        
+        print("Softmax Output...")
+        print(log_p[7][0])
+        '''
+        #print("Softmax argmax")
+        log_p = log_p.transpose(0,1)
+        #print(log_p.argmax(-1))
+
+        return log_p            # (batch_size, q_len, vocab_size)
     
+
+    def _reset_parameters(self):
+        "Initiate parameters in the transformer model."
+        for p in self.parameters():
+            if p.dim() > 1:
+                nn.init.xavier_uniform_(p)
+
     def generate_square_subsequent_mask(self, size):
         """Generate a square mask for the sequence. The masked positions are filled with float('-inf').
             Unmasked positions are filled with float(0.0).
         """
         mask = (torch.triu(torch.ones(size, size)) == 1).transpose(0, 1)
-        mask = mask.float().masked_fill(mask == 0, float('-inf')).masked_fill(mask == 1, float(0.0))
+        #mask = mask.float().masked_fill(mask == 0, float('-inf')).masked_fill(mask == 1, float(0.0))
         return mask
 
