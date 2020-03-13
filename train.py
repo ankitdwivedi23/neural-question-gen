@@ -215,8 +215,9 @@ def main(args):
 
                 # Setup for forward
                 re_cw_idxs = re_cw_idxs.to(device)
-                #re_cw_idxs = torch.cat((torch.zeros((batch_size, 1), device=device, dtype=torch.long), re_cw_idxs), dim=-1)
-                #re_cw_idxs[:,0] = 2
+                re_cw_idxs = torch.cat((torch.zeros((batch_size, 1), device=device, dtype=torch.long), re_cw_idxs, torch.zeros((batch_size, 1), device=device, dtype=torch.long)), dim=-1)
+                re_cw_idxs[:,0] = 2
+                re_cw_idxs[:,-1] = 3
                 qw_idxs = qw_idxs.to(device)
 
                 optimizer.zero_grad()
@@ -226,10 +227,10 @@ def main(args):
                 #copy_idxs = torch.cat((torch.zeros((batch_size, 1), device=device, dtype=torch.long), re_cw_idxs, torch.zeros((batch_size, 1), device=device, dtype=torch.long)), dim=-1)
                 #copy_idxs[:,0] = 2
                 #copy_idxs[:,-1] = 3
-                #copy_idxs_tgt = copy_idxs[:, :-1]
-                #copy_idxs_tgt_y = copy_idxs[:, 1:]
-                copy_idxs_tgt = re_cw_idxs
-                copy_idxs_tgt_y = re_cw_idxs
+                copy_idxs_tgt = re_cw_idxs[:, :-1]
+                copy_idxs_tgt_y = re_cw_idxs[:, 1:]
+                #copy_idxs_tgt = re_cw_idxs
+                #copy_idxs_tgt_y = re_cw_idxs
 
                 c_mask = (re_cw_idxs != pad).unsqueeze(-2)
                 copy_idxs_tgt_mask = make_std_mask(copy_idxs_tgt, pad)
