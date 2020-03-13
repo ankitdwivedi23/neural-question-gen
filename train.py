@@ -227,8 +227,8 @@ def main(args):
                 #copy_idxs = torch.cat((torch.zeros((batch_size, 1), device=device, dtype=torch.long), re_cw_idxs, torch.zeros((batch_size, 1), device=device, dtype=torch.long)), dim=-1)
                 #copy_idxs[:,0] = 2
                 #copy_idxs[:,-1] = 3
-                copy_idxs_tgt = re_cw_idxs[:, :-1]
-                copy_idxs_tgt_y = re_cw_idxs[:, 1:]
+                copy_idxs_tgt = qw_idxs[:, :-1]
+                copy_idxs_tgt_y = qw_idxs[:, 1:]
                 #copy_idxs_tgt = re_cw_idxs
                 #copy_idxs_tgt_y = re_cw_idxs
 
