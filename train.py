@@ -219,12 +219,13 @@ def main(args):
 
                 pad = 0
 
-                copy_idxs = torch.cat((torch.zeros((batch_size, 1), device=device, dtype=torch.long), re_cw_idxs, torch.zeros((batch_size, 1), device=device, dtype=torch.long)), dim=-1)
-                copy_idxs[:,0] = 2
-                copy_idxs[:,-1] = 3
-
-                copy_idxs_tgt = copy_idxs[:, :-1]
-                copy_idxs_tgt_y = copy_idxs[:, 1:]
+                #copy_idxs = torch.cat((torch.zeros((batch_size, 1), device=device, dtype=torch.long), re_cw_idxs, torch.zeros((batch_size, 1), device=device, dtype=torch.long)), dim=-1)
+                #copy_idxs[:,0] = 2
+                #copy_idxs[:,-1] = 3
+                #copy_idxs_tgt = copy_idxs[:, :-1]
+                #copy_idxs_tgt_y = copy_idxs[:, 1:]
+                copy_idxs_tgt = re_cw_idxs
+                copy_idxs_tgt_y = re_cw_idxs
 
                 c_mask = (re_cw_idxs != pad).unsqueeze(-2)
                 copy_idxs_tgt_mask = make_std_mask(copy_idxs_tgt, pad)
@@ -238,8 +239,12 @@ def main(args):
                 elif args.model_type == 'transformer':
                     log_p = model(re_cw_idxs, copy_idxs_tgt, c_mask, copy_idxs_tgt_mask)           #(batch_size, q_len, vocab_size)
                 
-                #print(re_cw_idxs[0])
-                #print(log_p[0].argmax(-1))
+                print("Source:")
+                print(re_cw_idxs[0])
+                print("Predicted:")
+                #print(log_p[0].shape)
+                print(log_p[0].argmax(-1))
+
                 #print(log_p.shape)
                 log_p = log_p.contiguous().view(log_p.size(0) * log_p.size(1), log_p.size(2))
                 #print(log_p.shape)
@@ -324,13 +329,14 @@ def main(args):
                     train_time = time.time()
                     report_loss = report_tgt_words = report_examples = 0.
 
-                    print(getWords(re_cw_idxs[batch_size-1].squeeze().tolist()))
+                    #print(getWords(re_cw_idxs[batch_size-1].squeeze().tolist()))
                     #print(getWords(qw_idxs[batch_size-1].squeeze().tolist()))
                     #util.evaluateRandomly(model, word2Idx, Idx2Word, re_cw_idxs[batch_size-1].unsqueeze(0), device)
-                    model.eval()
-                    predicted_words = util.greedy_decode(model, re_cw_idxs[batch_size-1].unsqueeze(0), c_mask[batch_size-1].unsqueeze(0), max_len=60, start_symbol=2)
-                    print(getWords(predicted_words.squeeze().tolist()))
-                    model.train()
+                    
+                    #model.eval()
+                    #predicted_words = util.greedy_decode(model, re_cw_idxs[batch_size-1].unsqueeze(0), c_mask[batch_size-1].unsqueeze(0), max_len=60, start_symbol=2)
+                    #print(getWords(predicted_words.squeeze().tolist()))
+                    #model.train()
                 
                 # perform validation
                 '''
