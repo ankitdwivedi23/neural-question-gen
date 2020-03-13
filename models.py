@@ -131,7 +131,7 @@ class Seq2SeqGru(nn.Module):
 
                 decoder_input = topi.squeeze().detach()
 
-            return decoded_words[0:20]
+            return decoded_words[0:4]
 
 ##################################################################################################################
 
