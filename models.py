@@ -54,17 +54,18 @@ class Seq2SeqGru(nn.Module):
                                         num_layers=num_layers)       
         self.encoder_optimizer = torch.optim.SGD(self.encoder.parameters(), lr=learning_rate)
         self.decoder_optimizer = torch.optim.SGD(self.decoder.parameters(), lr=learning_rate)
+        self.generator = layers.Generator(hidden_size, output_size)
 
-
-    def forward(self, cw_idx, qw_idx, max_length=3000):
+    def forward(self, cw_idxs, qw_idxs, max_length=3000):
 
         self.encoder_optimizer.zero_grad()
         self.decoder_optimizer.zero_grad()
 
-        input_tensor, target_tensor = cw_idx.permute(1,0), qw_idx.permute(1,0)
+        input_tensor, target_tensor = cw_idxs, qw_idxs
 
-        input_length = input_tensor.size(0)
-        target_length = target_tensor.size(0)
+        input_length = input_tensor.size(1)
+        target_length = target_tensor.size(1)
+        batch_size = cw_idxs.size(0)
 
         loss = 0
         input_mask = torch.zeros_like(input_tensor) != input_tensor
@@ -72,29 +73,33 @@ class Seq2SeqGru(nn.Module):
         input_emb =  self.emb(input_tensor)
         encoder_hidden, dec_init_state = self.encoder(input_emb, input_len)
 
-        decoder_input = torch.tensor([[self.SOS_token]], device=self.device).unsqueeze(0)
+        decoder_input = torch.tensor([[self.SOS_token]*batch_size], device=self.device)
+        
 
-        decoder_hidden = encoder_hidden
+        decoder_hidden = dec_init_state[0][:,-1,:].unsqueeze(1), dec_init_state[1][:,-1,:].unsqueeze(1)
 
         use_teacher_forcing = True if random.random() < self.teacher_forcing_ratio else False
 
         if use_teacher_forcing:
             # Teacher forcing: Feed the target as the next input
             for di in range(target_length):
+                decoder_input = self.emb(decoder_input)
                 decoder_output, decoder_hidden = self.decoder(decoder_input, decoder_hidden)
-                loss += self.criterion(decoder_output, target_tensor[di])
-                decoder_input = target_tensor[di]  # Teacher forcing
+                predicted = self.generator(decoder_output).contiguous()
+                loss += self.criterion(predicted.squeeze(0), target_tensor[:, di])
+                decoder_input = target_tensor[:, di].unsqueeze(0)  # Teacher forcing
 
         else:
             # Without teacher forcing: use its own predictions as the next input
             for di in range(target_length):
+                decoder_input = self.emb(decoder_input)
                 decoder_output, decoder_hidden = self.decoder(decoder_input, decoder_hidden)
                 topv, topi = decoder_output.topk(1)
-                decoder_input = topi.squeeze().detach()  # detach from history as input
-
-                loss += self.criterion(decoder_output, target_tensor[di])
-                if decoder_input.item() == self.EOS_token:
-                    break
+                decoder_input = topi.squeeze(2).detach()  # detach from history as input
+                predicted = self.generator(decoder_output)
+                loss += self.criterion(predicted.squeeze(0), target_tensor[:, di])
+                #if decoder_input.item() == self.EOS_token:
+                #    break
 
         loss.backward()
 

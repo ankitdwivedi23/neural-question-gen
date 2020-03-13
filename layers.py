@@ -149,6 +149,7 @@ class DecoderRNN(nn.Module):
 
     def forward(self, input, hidden):
         self.rnn.flatten_parameters()
+        input = F.relu(input)
         output, hidden = self.rnn(input, hidden)
         return output, hidden
 

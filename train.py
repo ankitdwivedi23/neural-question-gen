@@ -313,13 +313,13 @@ def gruMain(args):
     log.info('Building dataset...')
     train_dataset = SQuAD(args.train_record_file, args.use_squad_v2)
     train_loader = data.DataLoader(train_dataset,
-                                   batch_size=1,
+                                   batch_size=args.batch_size,
                                    shuffle=True,
                                    num_workers=args.num_workers,
                                    collate_fn=collate_fn)
     dev_dataset = SQuAD(args.dev_record_file, args.use_squad_v2)
     dev_loader = data.DataLoader(dev_dataset,
-                                 batch_size=1,
+                                 batch_size=args.batch_size,
                                  shuffle=False,
                                  num_workers=args.num_workers,
                                  collate_fn=collate_fn)
@@ -344,7 +344,7 @@ def gruMain(args):
 
                 # Forward
 
-                batch_loss = model(re_cw_idxs, re_cw_idxs[0:2])
+                batch_loss = model(re_cw_idxs, re_cw_idxs[:, 0:2])
                 loss = batch_loss / batch_size
 
                 # Log info
@@ -354,6 +354,21 @@ def gruMain(args):
 
         if epoch == args.num_epochs:
             log.info('reached maximum number of epochs!')
+
+    # Get data loader
+    log.info('Rebuilding dataset with batch size 1 for evaluate...')
+    train_dataset = SQuAD(args.train_record_file, args.use_squad_v2)
+    train_loader = data.DataLoader(train_dataset,
+                                   batch_size=1,
+                                   shuffle=True,
+                                   num_workers=args.num_workers,
+                                   collate_fn=collate_fn)
+    dev_dataset = SQuAD(args.dev_record_file, args.use_squad_v2)
+    dev_loader = data.DataLoader(dev_dataset,
+                                 batch_size=1,
+                                 shuffle=False,
+                                 num_workers=args.num_workers,
+                                 collate_fn=collate_fn)
 
     # Evaluate 
     log.info('Evaluate over dev')
