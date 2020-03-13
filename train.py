@@ -81,12 +81,7 @@ def main(args):
         return words
     
     def create_new_model():
-        if args.model_type == "seq2seqGru":
-            return Seq2SeqGru(word_vectors=word_vectors,
-                    hidden_size=args.hidden_size,
-                    output_size=vocab_size,
-                    device=device)
-        elif args.model_type == "seq2seq":
+        if args.model_type == "seq2seq":
             return Seq2Seq(word_vectors=word_vectors,
                     hidden_size=args.hidden_size,
                     output_size=vocab_size,
@@ -124,13 +119,7 @@ def main(args):
 
     # Get optimizer and scheduler    
     # Default project starter code uses Adadelta, but we're going to use Adam
-    # optimizer = torch.optim.Adam(model.parameters(), lr=float(args.lr))
-
-    # Trying SGD Optimizer
-    # optimizer = torch.optim.SGD(model.parameters(), lr=float(args.lr))
-
-    # Loss Function
-    # loss_function = nn.NLLLoss(reduction='sum')
+    optimizer = torch.optim.Adam(model.parameters(), lr=float(args.lr))
 
     num_trial = 0
     train_iter = patience = cum_loss = report_loss = cum_tgt_words = report_tgt_words = 0
@@ -160,50 +149,42 @@ def main(args):
         log.info(f'Starting epoch {epoch}...')
         with torch.enable_grad(), \
                 tqdm(total=len(train_loader.dataset)) as progress_bar:
-            for cw_idxs, re_cw_idxs, cc_idxs, qw_idxs_original, qc_idxs, y1, y2, ids in train_loader:
+            for cw_idxs, re_cw_idxs, cc_idxs, qw_idxs, qc_idxs, y1, y2, ids in train_loader:
                 
                 train_iter += 1
-                qw_idxs = cw_idxs[:, 0:2] #qw_idxs_original[:, 0:2]
+
                 # Setup for forward
                 re_cw_idxs = re_cw_idxs.to(device)
                 qw_idxs = qw_idxs.to(device)
                 batch_size = re_cw_idxs.size(0)
-                #optimizer.zero_grad()
+                optimizer.zero_grad()
                 
                 c_mask = torch.zeros_like(re_cw_idxs) != re_cw_idxs
                 q_mask = torch.zeros_like(qw_idxs) != qw_idxs
 
                 # Forward
-                if args.model_type == 'seq2seqGru':
-                    log_p = model(re_cw_idxs, qw_idxs)
-                elif args.model_type in ['seq2seq', 'seq2seq_attn']:
+
+                if args.model_type in ['seq2seq', 'seq2seq_attn']:
                     log_p = model(re_cw_idxs, qw_idxs)                  #(batch_size, q_len, vocab_size)
                 elif args.model_type == 'transformer':
                     log_p = model(re_cw_idxs, qw_idxs, c_mask, q_mask)  #(batch_size, q_len, vocab_size)
                 
-                
-                #log_p = log_p.contiguous().view(log_p.size(0) * log_p.size(1), log_p.size(2))
+                log_p = log_p.contiguous().view(log_p.size(0) * log_p.size(1), log_p.size(2))
                 qw_idxs_tgt = qw_idxs[:, 1:]     # omitting leading `SOS`
                 qw_idxs = qw_idxs.contiguous().view(qw_idxs.size(0) * qw_idxs.size(1))
                 qw_idxs_tgt = qw_idxs_tgt.contiguous().view(qw_idxs_tgt.size(0) * qw_idxs_tgt.size(1))
                 q_tgt_mask = torch.zeros_like(qw_idxs_tgt) != qw_idxs_tgt
                 q_len = q_tgt_mask.sum(-1)
-                
-                #print(log_p.size())
-                #print(qw_idxs_tgt.size())
-                #wait = input("Sab chill hai.. press to continue")
-                batch_loss = log_p #loss_function(log_p, qw_idxs_tgt)
+                batch_loss = F.nll_loss(log_p, qw_idxs_tgt, ignore_index=0, reduction='sum')
                 loss = batch_loss / batch_size
-                #loss_val = loss.item()
+                loss_val = loss.item()
 
-                '''
                 # Backward
                 loss.backward()
                 nn.utils.clip_grad_norm_(model.parameters(), args.max_grad_norm)
                 optimizer.step()
-                '''
-
-                batch_loss_val = batch_loss #batch_loss.item()
+                
+                batch_loss_val = batch_loss.item()
                 report_loss += batch_loss_val
                 cum_loss += batch_loss_val
 
@@ -212,12 +193,12 @@ def main(args):
                 cum_tgt_words += tgt_words_num_to_predict
                 report_examples += batch_size
                 cum_examples += batch_size
-                
+
                 # Log info
                 step += batch_size
                 progress_bar.update(batch_size)
                 progress_bar.set_postfix(epoch=epoch,
-                                         NLL=log_p)
+                                         NLL=loss_val)
                 
                 if train_iter % args.log_every == 0:
                     log.info('epoch %d, iter %d, avg. loss %.2f, avg. ppl %.2f ' \
@@ -234,7 +215,6 @@ def main(args):
                     #print(getWords(re_cw_idxs[batch_size-1].squeeze().tolist()))
                     #print(getWords(qw_idxs[batch_size-1].squeeze().tolist()))
                     #util.evaluateRandomly(model, word2Idx, Idx2Word, re_cw_idxs[batch_size-1].unsqueeze(0), device)
-                
                 
                 # perform validation
                 if train_iter % args.valid_niter == 0:
@@ -259,7 +239,7 @@ def main(args):
                         saver.save(step, model, results[args.metric_name], device)
 
                         # also save the optimizers' state
-                        # torch.save(optimizer.state_dict(), model_save_path + '.optim')
+                        torch.save(optimizer.state_dict(), model_save_path + '.optim')
                     
                     elif patience < args.patience_limit:
                         patience += 1
@@ -273,13 +253,13 @@ def main(args):
                                 exit(0)
 
                             # decay lr, and restore from previously best checkpoint
-                            # lr = optimizer.param_groups[0]['lr'] * args.lr_decay
+                            lr = optimizer.param_groups[0]['lr'] * args.lr_decay
                             log.info('load previously best model and decay learning rate to %f' % lr)
 
                             model, step = util.load_model(model, model_save_path, args.gpu_ids)
 
                             log.info('restore parameters of the optimizers')
-                            # optimizer.load_state_dict(torch.load(model_save_path + '.optim'))
+                            optimizer.load_state_dict(torch.load(model_save_path + '.optim'))
 
                             # set new lr
                             for param_group in optimizer.param_groups:
@@ -287,10 +267,106 @@ def main(args):
 
                             # reset patience
                             patience = 0
-                
+
                 if epoch == args.num_epochs:
                     log.info('reached maximum number of epochs!')
                     exit(0)
+
+def gruMain(args):
+    # Set up logging and devices
+    args.save_dir = util.get_save_dir(args.save_dir, args.name, training=True)
+    log = util.get_logger(args.save_dir, args.name)
+    device, args.gpu_ids = util.get_available_devices()
+    log.info(f'Args: {dumps(vars(args), indent=4, sort_keys=True)}')
+    args.batch_size *= max(1, len(args.gpu_ids))
+
+    # Set random seed
+    log.info(f'Using random seed {args.seed}...')
+    random.seed(args.seed)
+    np.random.seed(args.seed)
+    torch.manual_seed(args.seed)
+    torch.cuda.manual_seed_all(args.seed)
+
+    # Get embeddings
+    log.info('Loading embeddings...')
+    word_vectors = util.torch_from_json(args.word_emb_file)
+
+    log.info('Loading word2Idx...')
+    word2Idx = json.loads(open(args.word2idx_file).read())
+    Idx2Word = {v: k for (k,v) in word2Idx.items()}
+    vocab_size = len(word2Idx)
+
+    def getWords(idxList):
+        words = []
+        for i in idxList:
+            words.append(Idx2Word[i])
+        return words
+
+    # Get model
+    log.info('Building model...')
+    model = Seq2SeqGru(Idx2Word=Idx2Word, hidden_size=args.hidden_size,
+                    output_size=vocab_size,
+                    device=device)
+    model = model.to(device)
+
+    # Get data loader
+    log.info('Building dataset...')
+    train_dataset = SQuAD(args.train_record_file, args.use_squad_v2)
+    train_loader = data.DataLoader(train_dataset,
+                                   batch_size=1,
+                                   shuffle=True,
+                                   num_workers=args.num_workers,
+                                   collate_fn=collate_fn)
+    dev_dataset = SQuAD(args.dev_record_file, args.use_squad_v2)
+    dev_loader = data.DataLoader(dev_dataset,
+                                 batch_size=1,
+                                 shuffle=False,
+                                 num_workers=args.num_workers,
+                                 collate_fn=collate_fn)
+
+    # Train
+    log.info('Training...')
+    epoch = 0
+    report_loss = 0
+    while epoch != args.num_epochs:
+        epoch += 1
+        log.info(f'Starting epoch {epoch}...')
+        with torch.enable_grad(), \
+                tqdm(total=len(train_loader.dataset)) as progress_bar:
+            for cw_idxs, re_cw_idxs, cc_idxs, qw_idxs, qc_idxs, y1, y2, ids in train_loader:
+                # Setup for forward
+                re_cw_idxs = re_cw_idxs.to(device)
+                qw_idxs = qw_idxs.to(device)
+                batch_size = re_cw_idxs.size(0)
+                
+                c_mask = torch.zeros_like(re_cw_idxs) != re_cw_idxs
+                q_mask = torch.zeros_like(qw_idxs) != qw_idxs
+
+                # Forward
+
+                batch_loss = model(re_cw_idxs, re_cw_idxs)
+                loss = batch_loss / batch_size
+
+                # Log info
+                progress_bar.update(batch_size)
+                progress_bar.set_postfix(epoch=epoch,
+                                         NLL=loss)
+
+        if epoch == args.num_epochs:
+            log.info('reached maximum number of epochs!')
+
+    # Evaluate 
+    log.info('Evaluate over dev')
+    with torch.no_grad():
+        for cw_idxs, re_cw_idxs, cc_idxs, qw_idxs, qc_idxs, y1, y2, ids in dev_loader:
+            print(getWords(re_cw_idxs.squeeze().tolist()))
+            print(model.evaluate(re_cw_idxs))
+    
+    log.info('Evaluate over train')
+    with torch.no_grad():
+        for cw_idxs, re_cw_idxs, cc_idxs, qw_idxs, qc_idxs, y1, y2, ids in train_loader:
+            print(getWords(re_cw_idxs.squeeze().tolist()))
+            print(model.evaluate(re_cw_idxs))
 
 def evaluate(model, data_loader, device, use_squad_v2):
     """ Evaluate on dev questions
@@ -309,33 +385,31 @@ def evaluate(model, data_loader, device, use_squad_v2):
     cum_tgt_words = 0.
 
     # no_grad() signals backend to throw away all gradients
-    #with torch.no_grad():
-    for cw_idxs, re_cw_idxs, cc_idxs, qw_idxs, qc_idxs, y1, y2, ids in data_loader:
-        # Setup for forward
-        re_cw_idxs = re_cw_idxs.to(device)
-        qw_idxs = qw_idxs.to(device)
-        batch_size = re_cw_idxs.size(0)
-        
-        # Forward
-        log_p = model(re_cw_idxs, qw_idxs)        #(batch_size, q_len, vocab_size)
+    with torch.no_grad():
+        for cw_idxs, re_cw_idxs, cc_idxs, qw_idxs, qc_idxs, y1, y2, ids in data_loader:
+            # Setup for forward
+            re_cw_idxs = re_cw_idxs.to(device)
+            qw_idxs = qw_idxs.to(device)
+            batch_size = cw_idxs.size(0)
             
-        #log_p = log_p.contiguous().view(log_p.size(0) * log_p.size(1), log_p.size(2))
-        qw_idxs_target = qw_idxs[:, 1:]     # omitting leading `SOS`
-        qw_idxs_target = qw_idxs_target.contiguous().view(qw_idxs_target.size(0) * qw_idxs_target.size(1))
-        #loss = F.nll_loss(log_p, qw_idxs_target, ignore_index=0, reduction='sum')
-        #nll_meter.update(loss.item(), batch_size)
+            # Forward
+            log_p = model(cw_idxs, qw_idxs)        #(batch_size, q_len, vocab_size)
+                
+            log_p = log_p.contiguous().view(log_p.size(0) * log_p.size(1), log_p.size(2))
+            qw_idxs_target = qw_idxs[:, 1:]     # omitting leading `SOS`
+            qw_idxs_target = qw_idxs_target.contiguous().view(qw_idxs_target.size(0) * qw_idxs_target.size(1))
+            loss = F.nll_loss(log_p, qw_idxs_target, ignore_index=0, reduction='sum')
+            nll_meter.update(loss.item(), batch_size)
 
-        nll_meter.update(log_p, batch_size)
+            q_mask = torch.zeros_like(qw_idxs_target) != qw_idxs_target
+            q_len = q_mask.sum(-1)
 
-        q_mask = torch.zeros_like(qw_idxs_target) != qw_idxs_target
-        q_len = q_mask.sum(-1)
+            # Calculate perplexity        
+            cum_loss += loss.item()
+            tgt_word_num_to_predict = torch.sum(q_len).item()
+            cum_tgt_words += tgt_word_num_to_predict
 
-        # Calculate perplexity        
-        cum_loss += log_p #loss.item()
-        tgt_word_num_to_predict = torch.sum(q_len).item()
-        cum_tgt_words += tgt_word_num_to_predict
-
-    ppl = np.exp(cum_loss / cum_tgt_words)
+        ppl = np.exp(cum_loss / cum_tgt_words)
 
     results_list = [('NLL', nll_meter.avg), \
                 ('PPL', ppl)]
@@ -347,4 +421,4 @@ def evaluate(model, data_loader, device, use_squad_v2):
     return results
 
 if __name__ == '__main__':
-    main(get_train_args())
+    gruMain(get_train_args())

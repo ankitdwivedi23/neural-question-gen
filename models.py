@@ -29,18 +29,21 @@ class Seq2SeqGru(nn.Module):
         device (string): 'cuda:0' or 'cpu'
         drop_prob (float): Dropout probability.
     """
-    def __init__(self, word_vectors, hidden_size, output_size, device, drop_prob=0.2, learning_rate=0.5):
+    def __init__(self, Idx2Word, hidden_size, output_size, device, drop_prob=0.2, learning_rate=0.5):
         super(Seq2SeqGru, self).__init__()
 
         self.hidden_size = hidden_size
         self.output_size = output_size
         self.device = device
-        self.word_vectors = word_vectors
+        self.Idx2Word = Idx2Word
         self.model_type = 'seq2seqGru'
         self.teacher_forcing_ratio = 0.5
+        self.SOS_token = 2
+        self.EOS_token = 3
+        self.EOS = "--EOS--"
 
         self. criterion = nn.NLLLoss(reduction='sum')
-        self.encoder = layers.EncoderGRU(input_size=len(word_vectors),
+        self.encoder = layers.EncoderGRU(input_size=len(Idx2Word),
                                      hidden_size=hidden_size, device=self.device)
 
         self.decoder = layers.DecoderGRU(hidden_size=hidden_size,
@@ -49,63 +52,86 @@ class Seq2SeqGru(nn.Module):
         self.decoder_optimizer = torch.optim.SGD(self.decoder.parameters(), lr=learning_rate)
 
 
-    def forward(self, cw_idxs, qw_idxs, max_length=3000):
-        SOS_token = 2
-        EOS_token = 3
-        batch_loss = 0.
+    def forward(self, cw_idx, qw_idx, max_length=3000):
+        encoder_hidden = self.encoder.initHidden()
 
-        for cw_idx, qw_idx in zip(torch.split(cw_idxs, split_size_or_sections=1, dim=0), torch.split(qw_idxs, split_size_or_sections=1, dim=0)):
+        self.encoder_optimizer.zero_grad()
+        self.decoder_optimizer.zero_grad()
+
+        input_tensor, target_tensor = cw_idx.permute(1,0), qw_idx.permute(1,0)
+
+        input_length = input_tensor.size(0)
+        target_length = target_tensor.size(0)
+
+        encoder_outputs = torch.zeros(max_length, self.encoder.hidden_size, device=self.device)
+
+        loss = 0
+        for ei in range(input_length):
+            encoder_output, encoder_hidden = self.encoder(input_tensor[ei], encoder_hidden)
+            encoder_outputs[ei] = encoder_output[0, 0]
+
+        decoder_input = torch.tensor([[self.SOS_token]], device=self.device)
+
+        decoder_hidden = encoder_hidden
+
+        use_teacher_forcing = True if random.random() < self.teacher_forcing_ratio else False
+
+        if use_teacher_forcing:
+            # Teacher forcing: Feed the target as the next input
+            for di in range(target_length):
+                decoder_output, decoder_hidden = self.decoder(decoder_input, decoder_hidden)
+                loss += self.criterion(decoder_output, target_tensor[di])
+                decoder_input = target_tensor[di]  # Teacher forcing
+
+        else:
+            # Without teacher forcing: use its own predictions as the next input
+            for di in range(target_length):
+                decoder_output, decoder_hidden = self.decoder(decoder_input, decoder_hidden)
+                topv, topi = decoder_output.topk(1)
+                decoder_input = topi.squeeze().detach()  # detach from history as input
+
+                loss += self.criterion(decoder_output, target_tensor[di])
+                if decoder_input.item() == self.EOS_token:
+                    break
+
+        loss.backward()
+
+        self.encoder_optimizer.step()
+        self.decoder_optimizer.step()
+        
+        return loss.item() / target_length
+    
+    def evaluate(self, cw_idx, max_length=3000):
+        with torch.no_grad():
+            input_tensor = cw_idx.permute(1,0)
+            input_length = input_tensor.size()[0]
             encoder_hidden = self.encoder.initHidden()
-
-            self.encoder_optimizer.zero_grad()
-            self.decoder_optimizer.zero_grad()
-
-            input_tensor, target_tensor = cw_idx.permute(1,0), qw_idx.permute(1,0)
-
-            input_length = input_tensor.size(0)
-            target_length = target_tensor.size(0)
 
             encoder_outputs = torch.zeros(max_length, self.encoder.hidden_size, device=self.device)
 
-            loss = 0
-
             for ei in range(input_length):
-                encoder_output, encoder_hidden = self.encoder(input_tensor[ei], encoder_hidden)
-                encoder_outputs[ei] = encoder_output[0, 0]
+                encoder_output, encoder_hidden = self.encoder(input_tensor[ei],
+                                                        encoder_hidden)
+                encoder_outputs[ei] += encoder_output[0, 0]
 
-            decoder_input = torch.tensor([[SOS_token]], device=self.device)
+            decoder_input = torch.tensor([[self.SOS_token]], device=self.device)  # SOS
 
             decoder_hidden = encoder_hidden
 
-            use_teacher_forcing = True if random.random() < self.teacher_forcing_ratio else False
+            decoded_words = []
 
-            if use_teacher_forcing:
-                # Teacher forcing: Feed the target as the next input
-                for di in range(target_length):
-                    decoder_output, decoder_hidden = self.decoder(decoder_input, decoder_hidden)
-                    loss += self.criterion(decoder_output, target_tensor[di])
-                    decoder_input = target_tensor[di]  # Teacher forcing
+            for di in range(max_length):
+                decoder_output, decoder_hidden = self.decoder(decoder_input, decoder_hidden)
+                topv, topi = decoder_output.data.topk(1)
+                if topi.item() == self.EOS_token:
+                    decoded_words.append(self.EOS)
+                    break
+                else:
+                    decoded_words.append(self.Idx2Word[topi.item()])
 
-            else:
-                # Without teacher forcing: use its own predictions as the next input
-                for di in range(target_length):
-                    decoder_output, decoder_hidden = self.decoder(decoder_input, decoder_hidden)
-                    topv, topi = decoder_output.topk(1)
-                    decoder_input = topi.squeeze().detach()  # detach from history as input
+                decoder_input = topi.squeeze().detach()
 
-                    loss += self.criterion(decoder_output, target_tensor[di])
-                    if decoder_input.item() == EOS_token:
-                        break
-
-            loss.backward()
-
-            self.encoder_optimizer.step()
-            self.decoder_optimizer.step()
-
-            batch_loss += loss.item() / target_length
-        
-        return batch_loss
-      
+            return decoded_words[0:20]
 
 ##################################################################################################################
 

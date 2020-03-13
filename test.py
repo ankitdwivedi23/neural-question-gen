@@ -15,7 +15,7 @@ import json
 from args import get_test_args
 from collections import OrderedDict
 from json import dumps
-from models import Seq2Seq, Seq2SeqAttn, TransformerModel
+from models import Seq2SeqGru, Seq2Seq, Seq2SeqAttn, TransformerModel
 from os.path import join
 from tensorboardX import SummaryWriter
 from tqdm import tqdm
@@ -99,18 +99,14 @@ def main(args):
             cw_idxs = cw_idxs.to(device)
             qw_idxs = qw_idxs.to(device)
             batch_size = cw_idxs.size(0)
-            print(batch_size)
+
             # Forward
-            for cw_idx, qw_idx_original in zip(torch.split(re_cw_idxs, split_size_or_sections=1, dim=0), torch.split(qw_idxs, split_size_or_sections=1, dim=0)):
+            for cw_idx, qw_idx in zip(torch.split(cw_idxs, split_size_or_sections=1, dim=0), torch.split(qw_idxs, split_size_or_sections=1, dim=0)):
                 #y = F.one_hot(qw_idx, num_classes=len(word_vectors))
-                print(cw_idx.size())
-                print(qw_idx_original.size())
-                qw_idx = cw_idx[:, 0:1] #qw_idx_original[:, 0:2]
-                print(qw_idx.size())
-                print(getWords(cw_idx.squeeze().tolist()))
-                print(getWords(qw_idx.squeeze().tolist()))
-                util.TeacherForce(model, word2Idx, Idx2Word, cw_idx, qw_idx, device)
-                util.evaluateRandomly(model, word2Idx, Idx2Word, cw_idx, device)
+                #print(getWords(cw_idx.squeeze().tolist()))
+                #print(getWords(qw_idx.squeeze().tolist()))
+                #util.TeacherForce(model, word2Idx, Idx2Word, cw_idx, qw_idx, device)
+                #util.evaluateRandomly(model, word2Idx, Idx2Word, cw_idx, device)
 
                 hypotheses = util.beamSearch(model, word2Idx, Idx2Word, cw_idx, device)
                 loss = 0.
@@ -120,7 +116,7 @@ def main(args):
                     loss = loss + hyp.score
                     pred_dict[cw_idx].append(hyp.value)
                 nll_meter.update(loss, batch_size)
-                wait = input("Sab chill hai.. press to continue")
+                #wait = input("Sab chill hai.. press to continue")
 
                 cw_list.append(cw_idx)
                 qw_list.append(qw_idx)
