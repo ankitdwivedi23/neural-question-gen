@@ -87,6 +87,7 @@ class EncoderRNN(nn.Module):
                  drop_prob=0.):
         super(EncoderRNN, self).__init__()
         self.drop_prob = drop_prob
+        self.hidden_size = hidden_size
         self.rnn = nn.LSTM(input_size, hidden_size, num_layers,
                            batch_first=True,
                            bidirectional=True,

@@ -344,7 +344,7 @@ def gruMain(args):
 
                 # Forward
 
-                batch_loss = model(re_cw_idxs, re_cw_idxs[0:5])
+                batch_loss = model(re_cw_idxs, re_cw_idxs[0:2])
                 loss = batch_loss / batch_size
 
                 # Log info
