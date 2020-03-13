@@ -219,29 +219,45 @@ def main(args):
 
                 pad = 0
 
+                copy_idxs = torch.cat((torch.zeros((batch_size, 1), device=device, dtype=torch.long), re_cw_idxs, torch.zeros((batch_size, 1), device=device, dtype=torch.long)), dim=-1)
+                copy_idxs[:,0] = 2
+                copy_idxs[:,-1] = 3
+
+                copy_idxs_tgt = copy_idxs[:, :-1]
+                copy_idxs_tgt_y = copy_idxs[:, 1:]
+
                 c_mask = (re_cw_idxs != pad).unsqueeze(-2)
-                q_mask = make_std_mask(re_cw_idxs, pad)
+                copy_idxs_tgt_mask = make_std_mask(copy_idxs_tgt, pad)
+
+
 
                 # Forward
 
                 if args.model_type in ['seq2seq', 'seq2seq_attn']:
                     log_p = model(re_cw_idxs, qw_idxs)                  #(batch_size, q_len, vocab_size)
                 elif args.model_type == 'transformer':
-                    log_p = model(re_cw_idxs, re_cw_idxs, c_mask, q_mask)           #(batch_size, q_len, vocab_size)
+                    log_p = model(re_cw_idxs, copy_idxs_tgt, c_mask, copy_idxs_tgt_mask)           #(batch_size, q_len, vocab_size)
                 
-                #print(qw_idxs[0])
+                #print(re_cw_idxs[0])
                 #print(log_p[0].argmax(-1))
                 #print(log_p.shape)
-
                 log_p = log_p.contiguous().view(log_p.size(0) * log_p.size(1), log_p.size(2))
                 #print(log_p.shape)
+
+                
                 #qw_idxs_tgt = qw_idxs[:, 1:]     # omitting leading `SOS`
-                qw_idxs_tgt = re_cw_idxs
+                #qw_idxs_tgt = copy_idxs[:, 1:]
                 #print(qw_idxs_tgt.shape)
-                qw_idxs_tgt = qw_idxs_tgt.contiguous().view(qw_idxs_tgt.size(0) * qw_idxs_tgt.size(1))
+                #qw_idxs_tgt = qw_idxs_tgt.contiguous().view(qw_idxs_tgt.size(0) * qw_idxs_tgt.size(1))
                 #print(qw_idxs_tgt.shape)
-                q_tgt_mask = torch.zeros_like(qw_idxs_tgt) != qw_idxs_tgt
-                q_len = q_tgt_mask.sum(-1)
+                #q_tgt_mask = torch.zeros_like(qw_idxs_tgt) != qw_idxs_tgt
+                #q_len = q_tgt_mask.sum(-1)
+
+                copy_idxs_tgt_y = copy_idxs_tgt_y.contiguous().view(copy_idxs_tgt_y.size(0) * copy_idxs_tgt_y.size(1))
+                tgt_mask = torch.zeros_like(copy_idxs_tgt_y) != copy_idxs_tgt_y
+                tgt_len = tgt_mask.sum(-1)
+
+                
                 
                 #batch_loss = F.nll_loss(log_p, qw_idxs_tgt, ignore_index=0, reduction='sum')
 
@@ -257,7 +273,7 @@ def main(args):
                 #nn.utils.clip_grad_norm_(model.parameters(), args.max_grad_norm)
                 #optimizer.step()
                 
-                tgt_words_num_to_predict = torch.sum(q_len).item()
+                tgt_words_num_to_predict = torch.sum(tgt_len).item()
                 #print(f"Num of words: {tgt_words_num_to_predict}")
                 report_tgt_words += tgt_words_num_to_predict
                 cum_tgt_words += tgt_words_num_to_predict
@@ -265,7 +281,7 @@ def main(args):
                 cum_examples += batch_size
 
                 loss_compute = SimpleLossCompute(criterion, model_opt)
-                loss_val = loss_compute(log_p, qw_idxs_tgt, tgt_words_num_to_predict)
+                loss_val = loss_compute(log_p, copy_idxs_tgt_y, tgt_words_num_to_predict)
                 
                 '''
                 print("GRAD:")
@@ -308,9 +324,13 @@ def main(args):
                     train_time = time.time()
                     report_loss = report_tgt_words = report_examples = 0.
 
-                    #print(getWords(re_cw_idxs[batch_size-1].squeeze().tolist()))
+                    print(getWords(re_cw_idxs[batch_size-1].squeeze().tolist()))
                     #print(getWords(qw_idxs[batch_size-1].squeeze().tolist()))
                     #util.evaluateRandomly(model, word2Idx, Idx2Word, re_cw_idxs[batch_size-1].unsqueeze(0), device)
+                    model.eval()
+                    predicted_words = util.greedy_decode(model, re_cw_idxs[batch_size-1].unsqueeze(0), c_mask[batch_size-1].unsqueeze(0), max_len=60, start_symbol=2)
+                    print(getWords(predicted_words.squeeze().tolist()))
+                    model.train()
                 
                 # perform validation
                 '''

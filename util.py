@@ -21,6 +21,7 @@ from collections import namedtuple
 Hypothesis = namedtuple('Hypothesis', ['value', 'score'])
 from typing import List, Tuple, Dict, Set, Union
 from torchtext.data.metrics import bleu_score
+from transformer import make_model, make_std_mask
 
 class SQuAD(data.Dataset):
     """Stanford Question Answering Dataset (SQuAD).
@@ -595,33 +596,24 @@ def evaluateRandomly(model, word2idx_dict, idx2word_dict, cw_idx, device):
     EOS = "--EOS--"
     max_len = 10
 
-    if model.module.model_type in ['seq2seq', 'seq2seq_attn']:
+    with torch.no_grad():        
         _, dec_init_state = model.module.encode(cw_idx)
-    elif model.module.model_type == 'transformer':
-        #TODO: add code for transformer
-        pass
+        prev_word = SOS
+        h_t = dec_init_state
 
-    prev_word = SOS
-    h_t = dec_init_state
+        t = 0
+        sent = []
 
-    t = 0
-    sent = []
-
-    while prev_word != EOS and t < max_len:
-        sent.append(prev_word)
-        eos_id = word2idx_dict[EOS] 
-        y_tm1 = torch.tensor([[word2idx_dict[prev_word]]], dtype=torch.long, device=device)
-
-        if model.module.model_type in ['seq2seq', 'seq2seq_attn']:
+        while prev_word != EOS and t < max_len:
+            sent.append(prev_word)
+            eos_id = word2idx_dict[EOS] 
+            y_tm1 = torch.tensor([[word2idx_dict[prev_word]]], dtype=torch.long, device=device)
             h_t, log_p_t  = model.module.decode(h_t, y_tm1)
-        elif model.module.model_type == 'transformer':
-            #TODO: add code for transformer
-            pass
-        
-        prev_word = idx2word_dict[log_p_t.argmax(-1).squeeze().tolist()]
-        t = t+1
+            prev_word = idx2word_dict[log_p_t.argmax(-1).squeeze().tolist()]
+            t = t+1
 
-    print(sent)
+        print(sent)
+    
 
 def evaluate(model, word2idx_dict, idx2word_dict, cw_idx, device):
     SOS = "--SOS--"
@@ -780,6 +772,19 @@ def beamSearch(model, word2idx_dict, idx2word_dict, cw_idx, device, beam_size: i
     #print(completed_hypotheses)
     return completed_hypotheses
 
+
+def greedy_decode(model, src, src_mask, max_len, start_symbol):
+    with torch.no_grad():
+        memory = model.module.encode(src, src_mask)
+        ys = torch.ones(1, 1).fill_(start_symbol).type_as(src.data)
+        for i in range(max_len-1):
+            prob = model.module.decode(memory, src_mask, ys, make_std_mask(ys, 0).type_as(src.data))
+            #prob = model.generator(out[:, -1])
+            next_word = prob[0][-1].argmax(-1)
+            next_word = next_word.item()
+            ys = torch.cat([ys,
+                            torch.ones(1, 1).type_as(src.data).fill_(next_word)], dim=1)
+        return ys
 
 def convert_tokens(eval_dict, qa_id, y_start_list, y_end_list, no_answer):
     """Convert predictions to tokens from the context.
