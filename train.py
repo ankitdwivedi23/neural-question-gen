@@ -323,6 +323,18 @@ def main(args):
                                                                                          time.time() - begin_time))
                     '''
 
+                    print("Source:")
+                    print(getWords(re_cw_idxs[0].squeeze().tolist()))
+                    #print(getWords(qw_idxs[batch_size-1].squeeze().tolist()))
+                    #util.evaluateRandomly(model, word2Idx, Idx2Word, re_cw_idxs[batch_size-1].unsqueeze(0), device)
+                    
+                    print("Predicted:")
+                    model.eval()
+                    predicted_words = util.greedy_decode(model, re_cw_idxs[0].unsqueeze(0), c_mask[0].unsqueeze(0), max_len=30, start_symbol=2)
+                    print(getWords(predicted_words.squeeze().tolist()))
+                    model.train()
+
+
                     log.info('epoch %d, iter %d, avg. loss %.2f, avg. ppl %.2f ' \
                       'cum. examples %d, speed %.2f words/sec, time elapsed %.2f sec' % (epoch, train_iter,
                                                                                          loss_val / tgt_words_num_to_predict,
@@ -333,15 +345,6 @@ def main(args):
 
                     train_time = time.time()
                     report_loss = report_tgt_words = report_examples = 0.
-
-                    #print(getWords(re_cw_idxs[batch_size-1].squeeze().tolist()))
-                    #print(getWords(qw_idxs[batch_size-1].squeeze().tolist()))
-                    #util.evaluateRandomly(model, word2Idx, Idx2Word, re_cw_idxs[batch_size-1].unsqueeze(0), device)
-                    
-                    #model.eval()
-                    #predicted_words = util.greedy_decode(model, re_cw_idxs[batch_size-1].unsqueeze(0), c_mask[batch_size-1].unsqueeze(0), max_len=60, start_symbol=2)
-                    #print(getWords(predicted_words.squeeze().tolist()))
-                    #model.train()
                 
                 # perform validation
                 '''
