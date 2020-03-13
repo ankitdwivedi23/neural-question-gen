@@ -244,8 +244,10 @@ def main(args):
                 elif args.model_type == 'transformer':
                     log_p = model(re_cw_idxs, copy_idxs_tgt, c_mask, copy_idxs_tgt_mask)           #(batch_size, q_len, vocab_size)
                 
-                print("Source:")
+                print("Context:")
                 print(re_cw_idxs[0])
+                print("Question:")
+                print(copy_idxs_tgt[0])
                 print("Predicted:")
                 #print(log_p[0].shape)
                 print(log_p[0].argmax(-1))
@@ -323,11 +325,14 @@ def main(args):
                                                                                          time.time() - begin_time))
                     '''
 
-                    print("Source Words:")
+                    print("Context Words:")
                     print(getWords(re_cw_idxs[0].squeeze().tolist()))
                     #print(getWords(qw_idxs[batch_size-1].squeeze().tolist()))
                     #util.evaluateRandomly(model, word2Idx, Idx2Word, re_cw_idxs[batch_size-1].unsqueeze(0), device)
                     
+                    print("Question Words:")
+                    print(getWords(copy_idxs_tgt[0].squeeze().tolist()))
+
                     print("Predicted Words:")
                     model.eval()
                     predicted_words = util.greedy_decode(model, re_cw_idxs[0].unsqueeze(0), c_mask[0].unsqueeze(0), max_len=30, start_symbol=2)
