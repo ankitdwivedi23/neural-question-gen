@@ -150,7 +150,7 @@ def main(args):
                     device=device)
         elif args.model_type == "transformer":
             #return TransformerModel(word_vectors, device)
-            return make_model(vocab_size, vocab_size, dropout=0.1)
+            return make_model(vocab_size, vocab_size, N=2)
 
     # Get model
     log.info('Building model...')
