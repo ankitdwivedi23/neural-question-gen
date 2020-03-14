@@ -68,15 +68,15 @@ class SimpleLossCompute:
         self.opt = opt
         
     def __call__(self, x, y, norm):
-        x = x.contiguous().view(-1, x.size(-1))
-        y = y.contiguous().view(-1)
+        #x = x.contiguous().view(-1, x.size(-1))
+        #y = y.contiguous().view(-1)
 
         loss = self.criterion(x, y) / norm
         loss.backward()
 
         if self.opt is not None:
-            self.opt.step()
             self.opt.optimizer.zero_grad()
+            self.opt.step()            
         return loss.item() * norm
 
 
@@ -99,6 +99,7 @@ def percentile(t: torch.tensor, q: float) -> Union[int, float]:
     k = 1 + round(.01 * float(q) * (t.numel() - 1))
     result = t.view(-1).kthvalue(k)
     return result
+
 
 def main(args):    
     # Set up logging and devices
@@ -177,11 +178,11 @@ def main(args):
 
     # Get optimizer and scheduler    
     # Default project starter code uses Adadelta, but we're going to use Adam
-    optimizer = torch.optim.Adam(model.parameters(), lr=float(args.lr))
+    #optimizer = torch.optim.Adam(model.parameters(), lr=float(args.lr))
 
     num_trial = 0
-    train_iter = patience = cum_loss = report_loss = cum_tgt_words = report_tgt_words = 0
-    cum_examples = report_examples = epoch = valid_num = 0
+    train_iter = patience = total_loss = report_loss = total_words = report_words = 0
+    total_examples = report_examples = epoch = valid_num = 0
     train_time = begin_time = time.time()
 
     # Get data loader
@@ -221,7 +222,7 @@ def main(args):
                 #cw_idxs = cw_idxs.to(device)
                 qw_idxs = qw_idxs.to(device)
 
-                optimizer.zero_grad()
+                #optimizer.zero_grad()
 
                 pad = 0
 
@@ -253,7 +254,7 @@ def main(args):
                 print(log_p[0].argmax(-1))
 
                 #print(log_p.shape)
-                log_p = log_p.contiguous().view(log_p.size(0) * log_p.size(1), log_p.size(2))
+                log_p = log_p.contiguous().view(-1, log_p.size(-1))
                 #print(log_p.shape)
 
                 
@@ -265,7 +266,7 @@ def main(args):
                 #q_tgt_mask = torch.zeros_like(qw_idxs_tgt) != qw_idxs_tgt
                 #q_len = q_tgt_mask.sum(-1)
 
-                copy_idxs_tgt_y = copy_idxs_tgt_y.contiguous().view(copy_idxs_tgt_y.size(0) * copy_idxs_tgt_y.size(1))
+                copy_idxs_tgt_y = copy_idxs_tgt_y.contiguous().view(-1)
                 tgt_mask = torch.zeros_like(copy_idxs_tgt_y) != copy_idxs_tgt_y
                 tgt_len = tgt_mask.sum(-1)
 
@@ -285,34 +286,32 @@ def main(args):
                 #nn.utils.clip_grad_norm_(model.parameters(), args.max_grad_norm)
                 #optimizer.step()
                 
-                tgt_words_num_to_predict = torch.sum(tgt_len).item()
+                batch_words = torch.sum(tgt_len).item()
                 #print(f"Num of words: {tgt_words_num_to_predict}")
-                report_tgt_words += tgt_words_num_to_predict
-                cum_tgt_words += tgt_words_num_to_predict
-                #report_examples += batch_size
-                cum_examples += batch_size
+                report_words += batch_words
+                total_words += batch_words
+                report_examples += batch_size
+                total_examples += batch_size
 
                 loss_compute = SimpleLossCompute(criterion, model_opt)
-                loss_val = loss_compute(log_p, copy_idxs_tgt_y, tgt_words_num_to_predict)
+                batch_loss = loss_compute(log_p, copy_idxs_tgt_y, batch_words)
                 
                 '''
-                print("GRAD:")
-                print(f'cw_idxs: {cw_idxs.requires_grad}')
-                print(f'qw_idxs_tgt: {qw_idxs_tgt.requires_grad}')
-                print(f'log_p: {log_p.requires_grad}')
-                print(f're_cw_idxs: {re_cw_idxs.requires_grad}')
-                print(f'q_tgt_mask: {q_tgt_mask.requires_grad}')
+                model_opt.optimizer.zero_grad()
+                loss = criterion(log_p, copy_idxs_tgt_y) / batch_words
+                loss.backward()
+                model_opt.step()
                 '''
 
-                #batch_loss_val = batch_loss.item()
-                #report_loss += loss_val
-                cum_loss += loss_val
+                #batch_loss = loss.item() * batch_words
+                report_loss += batch_loss
+                total_loss += batch_loss
 
                 # Log info
                 step += batch_size
                 progress_bar.update(batch_size)
                 progress_bar.set_postfix(epoch=epoch,
-                                         NLL=loss_val)
+                                         NLL=batch_loss)
                 
                 if train_iter % args.log_every == 0:
                     '''
@@ -344,14 +343,14 @@ def main(args):
 
                     log.info('epoch %d, iter %d, avg. loss %.2f, avg. ppl %.2f ' \
                       'cum. examples %d, speed %.2f words/sec, time elapsed %.2f sec' % (epoch, train_iter,
-                                                                                         loss_val / tgt_words_num_to_predict,
-                                                                                         math.exp(loss_val / tgt_words_num_to_predict),
-                                                                                         cum_examples,
-                                                                                         report_tgt_words / (time.time() - train_time),
+                                                                                         report_loss / report_words,
+                                                                                         math.exp(report_loss / report_words),
+                                                                                         total_examples,
+                                                                                         report_words / (time.time() - train_time),
                                                                                          time.time() - begin_time))
 
                     train_time = time.time()
-                    report_loss = report_tgt_words = report_examples = 0.
+                    report_loss = report_words = report_examples = 0.
                 
                 # perform validation
                 '''
