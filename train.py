@@ -219,7 +219,7 @@ def main(args):
                 re_cw_idxs[:,0] = 2
                 re_cw_idxs[:,-1] = 3
                 #cw_idxs = cw_idxs.to(device)
-                #qw_idxs = qw_idxs.to(device)
+                qw_idxs = qw_idxs.to(device)
 
                 optimizer.zero_grad()
 
