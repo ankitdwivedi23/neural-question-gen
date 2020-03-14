@@ -243,7 +243,7 @@ class EncoderRNNCell(nn.Module):
         self.input_size = input_size
         self.hidden_size = hidden_size
         self.device = device
-        self.embedding = nn.Embedding(output_size, hidden_size)
+        self.embedding = nn.Embedding(output_size, hidden_size, padding_idx=0)
         self.rnn = nn.LSTM(input_size, hidden_size)
 
     def forward(self, input, hidden):
@@ -265,7 +265,7 @@ class DecoderSimpleRNN(nn.Module):
         super(DecoderSimpleRNN, self).__init__()
         self.input_size = input_size
         self.hidden_size = hidden_size
-        self.embedding = nn.Embedding(output_size, hidden_size)
+        self.embedding = nn.Embedding(output_size, hidden_size, padding_idx=0)
         self.rnn = nn.LSTM(input_size, hidden_size)
 
     def forward(self, input, hidden):
