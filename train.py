@@ -369,6 +369,8 @@ def gruMain(args):
                                  shuffle=False,
                                  num_workers=args.num_workers,
                                  collate_fn=collate_fn)
+    
+    model = model.to(device)
 
     # Evaluate 
     log.info('Evaluate over dev')
