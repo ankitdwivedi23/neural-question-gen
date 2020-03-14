@@ -369,9 +369,6 @@ def gruMain(args):
                                  shuffle=False,
                                  num_workers=args.num_workers,
                                  collate_fn=collate_fn)
-    
-    model = model.to(device)
-
     # Evaluate 
     log.info('Evaluate over dev')
     with torch.no_grad():
@@ -384,6 +381,7 @@ def gruMain(args):
         for cw_idxs, re_cw_idxs, cc_idxs, qw_idxs, qc_idxs, y1, y2, ids in train_loader:
             print(getWords(re_cw_idxs.squeeze().tolist()))
             print(model.evaluate(re_cw_idxs))
+            
 
 def evaluate(model, data_loader, device, use_squad_v2):
     """ Evaluate on dev questions
