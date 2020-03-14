@@ -264,6 +264,7 @@ class DecoderSimpleRNN(nn.Module):
     def __init__(self, input_size, output_size, hidden_size, device):
         super(DecoderSimpleRNN, self).__init__()
         self.input_size = input_size
+        self.device = device
         self.hidden_size = hidden_size
         self.embedding = nn.Embedding(output_size, hidden_size, padding_idx=0)
         self.rnn = nn.LSTM(input_size, hidden_size)
