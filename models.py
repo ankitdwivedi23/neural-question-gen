@@ -296,11 +296,10 @@ class TransformerModel(nn.Module):
         return enc_out
     
     def decode(self, qw_idxs, enc_out, c_mask, q_mask):
-        q_mask = torch.zeros_like(qw_idxs) == qw_idxs
         q_emb = self.tgt_emb(qw_idxs)                   # (batch_size, q_len, d_model)
         q_emb = q_emb.transpose(0,1)                # (q_len, batch_size, d_model)
 
-        self_attn_mask = self.generate_square_subsequent_mask(q_mask.size(1)).to(device=self.device)    # (q_len, q_len)
+        self_attn_mask = self.generate_square_subsequent_mask(qw_idxs.size(1)).to(device=self.device)    # (q_len, q_len)
 
         dec_out = self.decoder(
             tgt=q_emb,
