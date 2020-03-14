@@ -166,6 +166,11 @@ def main(args):
     model = model.to(device)
     model.train()
 
+    criterion = nn.NLLLoss(ignore_index=0, reduction='sum')
+    model_opt = NoamOpt(model.module.src_emb[0].d_model, 1, 400,
+                        torch.optim.Adam(model.parameters(), lr=0, betas=(0.9, 0.98), eps=1e-9))
+    loss_compute = SimpleLossCompute(criterion, model_opt)
+
     # Get saver
     saver = util.CheckpointSaver(args.save_dir,
                                  args.best_model_name,
@@ -272,11 +277,7 @@ def main(args):
 
                 
                 
-                #batch_loss = F.nll_loss(log_p, qw_idxs_tgt, ignore_index=0, reduction='sum')
-
-                criterion = nn.NLLLoss(ignore_index=0, reduction='sum')
-                model_opt = NoamOpt(model.module.src_emb[0].d_model, 1, 400,
-                                    torch.optim.Adam(model.parameters(), lr=0, betas=(0.9, 0.98), eps=1e-9))                
+                #batch_loss = F.nll_loss(log_p, qw_idxs_tgt, ignore_index=0, reduction='sum')               
 
                 #loss = batch_loss / batch_size
                 #loss_val = loss.item()
@@ -293,7 +294,6 @@ def main(args):
                 report_examples += batch_size
                 total_examples += batch_size
 
-                loss_compute = SimpleLossCompute(criterion, model_opt)
                 batch_loss = loss_compute(log_p, copy_idxs_tgt_y, batch_words)
                 
                 '''
