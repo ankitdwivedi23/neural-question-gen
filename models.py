@@ -29,7 +29,7 @@ class Seq2SeqGru(nn.Module):
         device (string): 'cuda:0' or 'cpu'
         drop_prob (float): Dropout probability.
     """
-    def __init__(self, Idx2Word, hidden_size, output_size, device, drop_prob=0.2, learning_rate=0.5, num_layers=1):
+    def __init__(self, Idx2Word, hidden_size, output_size, device, drop_prob=0.2, learning_rate=0.01, num_layers=1):
         super(Seq2SeqGru, self).__init__()
 
         self.hidden_size = hidden_size
@@ -37,20 +37,19 @@ class Seq2SeqGru(nn.Module):
         self.device = device
         self.Idx2Word = Idx2Word
         self.model_type = 'seq2seqGru'
-        self.teacher_forcing_ratio = 0.
+        self.teacher_forcing_ratio = 0.5
         self.SOS_token = 2
         self.EOS_token = 3
         self.EOS = "--EOS--"
 
         self. criterion = nn.NLLLoss(reduction='sum')
-        self.emb = nn.Embedding(num_embeddings=output_size, embedding_dim=hidden_size, padding_idx=0)
-        self.encoder = layers.EncoderRNNCell(input_size=hidden_size,
+        self.encoder = layers.EncoderRNNCell(input_size=hidden_size, output_size=output_size,
                                      hidden_size=hidden_size,
                                      device=device)
 
-        self.decoder = layers.DecoderRNN(input_size=hidden_size,
+        self.decoder = layers.DecoderSimpleRNN(input_size=hidden_size, output_size=output_size,
                                         hidden_size=hidden_size,
-                                        num_layers=num_layers)       
+                                        device=device)       
         self.encoder_optimizer = torch.optim.SGD(self.encoder.parameters(), lr=learning_rate)
         self.decoder_optimizer = torch.optim.SGD(self.decoder.parameters(), lr=learning_rate)
         self.generator = layers.Generator(hidden_size, output_size)
@@ -70,24 +69,18 @@ class Seq2SeqGru(nn.Module):
         
         encoder_hidden = self.encoder.initHidden(batch_size), self.encoder.initHidden(batch_size)
         for ei in range(input_length):
-            input_emb =  self.emb(input_tensor[:, ei]).unsqueeze(0)
-            encoder_output, encoder_hidden = self.encoder(input_emb,
-                                                        encoder_hidden)
+            encoder_output, encoder_hidden = self.encoder(input_tensor[:, ei].unsqueeze(0), encoder_hidden)
             encoder_hidden = encoder_hidden[0].unsqueeze(0), encoder_hidden
-
-        dec_init_state = encoder_hidden
 
         decoder_input = torch.tensor([[self.SOS_token]*batch_size], device=self.device)
         
-
-        decoder_hidden = dec_init_state[0][:,-1,:].unsqueeze(1), dec_init_state[1][:,-1,:].unsqueeze(1)
+        decoder_hidden =  encoder_hidden
 
         use_teacher_forcing = True if random.random() < self.teacher_forcing_ratio else False
 
         if use_teacher_forcing:
             # Teacher forcing: Feed the target as the next input
             for di in range(target_length):
-                decoder_input = self.emb(decoder_input)
                 decoder_output, decoder_hidden = self.decoder(decoder_input, decoder_hidden)
                 predicted = self.generator(decoder_output)
                 loss += self.criterion(predicted.squeeze(0), target_tensor[:, di])
@@ -96,7 +89,6 @@ class Seq2SeqGru(nn.Module):
         else:
             # Without teacher forcing: use its own predictions as the next input
             for di in range(target_length):
-                decoder_input = self.emb(decoder_input)
                 decoder_output, decoder_hidden = self.decoder(decoder_input, decoder_hidden)
                 topv, topi = decoder_output.topk(1)
                 decoder_input = topi.squeeze(2).detach()  # detach from history as input
@@ -106,7 +98,6 @@ class Seq2SeqGru(nn.Module):
                 #    break
 
         loss.backward()
-
         self.encoder_optimizer.step()
         self.decoder_optimizer.step()
         
@@ -117,18 +108,15 @@ class Seq2SeqGru(nn.Module):
             input_tensor = cw_idxs
             input_length = input_tensor.size(1)
             batch_size = cw_idxs.size(0)
-            encoder_hidden = torch.zeros(1, 1, self.hidden_size, device=self.device)
 
             encoder_outputs = torch.zeros(max_length, self.encoder.hidden_size, device=self.device)
 
             input_mask = torch.zeros_like(input_tensor) != input_tensor
             input_len = input_mask.sum(-1)
-            input_emb =  self.emb(input_tensor)
 
             encoder_hidden = self.encoder.initHidden(batch_size), self.encoder.initHidden(batch_size)
             for ei in range(input_length):
-                input_emb =  self.emb(input_tensor[:, ei]).unsqueeze(0)
-                encoder_output, encoder_hidden = self.encoder(input_emb,
+                encoder_output, encoder_hidden = self.encoder(input_tensor[:, ei].unsqueeze(0),
                                                             encoder_hidden)
                 encoder_hidden = encoder_hidden[0].unsqueeze(0), encoder_hidden
 
@@ -139,7 +127,6 @@ class Seq2SeqGru(nn.Module):
             decoded_words = []
 
             for di in range(max_length):
-                decoder_input = self.emb(decoder_input)
                 decoder_output, decoder_hidden = self.decoder(decoder_input, decoder_hidden)
                 topv, topi = decoder_output.data.topk(1)
                 if topi.item() == self.EOS_token:

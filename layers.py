@@ -149,7 +149,6 @@ class DecoderRNN(nn.Module):
 
     def forward(self, input, hidden):
         self.rnn.flatten_parameters()
-        input = F.relu(input)
         output, hidden = self.rnn(input, hidden)
         return output, hidden
 
@@ -239,16 +238,41 @@ class EncoderRNNCell(nn.Module):
         input_size (int): Size of a single timestep in the input.
         hidden_size (int): Size of the RNN hidden state.
     """
-    def __init__(self, input_size, hidden_size, device):
+    def __init__(self, input_size, output_size, hidden_size, device):
         super(EncoderRNNCell, self).__init__()
         self.input_size = input_size
         self.hidden_size = hidden_size
         self.device = device
+        self.embedding = nn.Embedding(output_size, hidden_size)
         self.rnn = nn.LSTM(input_size, hidden_size)
 
     def forward(self, input, hidden):
+        input = self.embedding(input)
         output, hidden = self.rnn(input, hidden)
         return hidden
+    
+    def initHidden(self, batch_size):
+        return torch.zeros(1, batch_size, self.hidden_size, device=self.device)
+
+class DecoderSimpleRNN(nn.Module):
+    """General-purpose layer for decoding the output of an encoder using RNN.
+    Args:
+        input_size (int): Size of a single timestep in the input.
+        hidden_size (int): Size of the RNN hidden state.
+        num_layers (int): Number of layers of RNN cells to use.
+    """
+    def __init__(self, input_size, output_size, hidden_size, device):
+        super(DecoderSimpleRNN, self).__init__()
+        self.input_size = input_size
+        self.hidden_size = hidden_size
+        self.embedding = nn.Embedding(output_size, hidden_size)
+        self.rnn = nn.LSTM(input_size, hidden_size)
+
+    def forward(self, input, hidden):
+        input = self.embedding(input)
+        input = F.relu(input)
+        output, hidden = self.rnn(input, hidden)
+        return output, hidden
     
     def initHidden(self, batch_size):
         return torch.zeros(1, batch_size, self.hidden_size, device=self.device)

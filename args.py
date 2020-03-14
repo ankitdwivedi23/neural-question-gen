@@ -103,7 +103,7 @@ def get_train_args():
                         help='Number of iterations between successive logging')
     parser.add_argument('--lr',
                         type=float,
-                        default=0.5,
+                        default=0.01,
                         help='Learning rate.')
     parser.add_argument('--lr_decay',
                         type=float,
