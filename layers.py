@@ -189,7 +189,7 @@ class EncoderGRU(nn.Module):
         super(EncoderGRU, self).__init__()
         self.hidden_size = hidden_size
         self.device = device
-        self.embedding = nn.Embedding(input_size, hidden_size)
+        self.embedding = nn.Embedding(output_size, hidden_size)
         self.gru = nn.GRU(hidden_size, hidden_size)
 
     def forward(self, input, hidden):
@@ -222,4 +222,13 @@ class DecoderGRU(nn.Module):
     def initHidden(self):
         return torch.zeros(1, 1, self.hidden_size, device=self.device)
 
+class EncoderSimpleRNN(nn.Module):
+    def __init__(self, input_size, hidden_size, device):
+        super(EncoderSimpleRNN, self).__init__()
+        self.hidden_size = hidden_size
+        self.device = device
+        self.rnn = nn.LSTM(input_size, hidden_size, batch_first=True)
 
+    def forward(self, input, lengths):
+        output, hidden = self.rnn(input)
+        return output, hidden
