@@ -274,7 +274,7 @@ def main(args):
                 #batch_loss = F.nll_loss(log_p, qw_idxs_tgt, ignore_index=0, reduction='sum')
 
                 criterion = nn.NLLLoss(ignore_index=0, reduction='sum')
-                model_opt = NoamOpt(model.module.src_emb.d_model, 1, 400,
+                model_opt = NoamOpt(model.module.src_emb[0].d_model, 1, 400,
                                     torch.optim.Adam(model.parameters(), lr=0, betas=(0.9, 0.98), eps=1e-9))                
 
                 #loss = batch_loss / batch_size

@@ -10,6 +10,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import layers
 import util
+import copy
 
 from typing import List, Tuple, Dict, Set, Union
 
@@ -259,9 +260,11 @@ class TransformerModel(nn.Module):
     """
     def __init__(self, vocab_size, device, d_model=512, nhead=8, num_encoder_layers=6, num_decoder_layers=6, dim_feedforward=2048, dropout=0.1):
         super(TransformerModel, self).__init__()
+        c = copy.deepcopy
+        position = layers.PositionalEncoding(d_model, dropout)
         self.device = device
-        self.src_emb = layers.TransformerEmbedding(d_model, vocab_size)
-        self.tgt_emb = layers.TransformerEmbedding(d_model, vocab_size)
+        self.src_emb = nn.Sequential(layers.TransformerEmbedding(d_model, vocab_size), c(position))
+        self.tgt_emb = nn.Sequential(layers.TransformerEmbedding(d_model, vocab_size), c(position))
         #self.emb = nn.Embedding(num_embeddings=vocab_size, embedding_dim=d_model, padding_idx=0)
         self.encoder_layer = nn.TransformerEncoderLayer(d_model, nhead, dim_feedforward, dropout)
         self.encoder = nn.TransformerEncoder(self.encoder_layer, num_encoder_layers)
