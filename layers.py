@@ -232,3 +232,23 @@ class EncoderSimpleRNN(nn.Module):
     def forward(self, input, lengths):
         output, hidden = self.rnn(input)
         return output, hidden
+
+class EncoderRNNCell(nn.Module):
+    """General-purpose layer for decoding the output of an encoder using RNN.
+    Args:
+        input_size (int): Size of a single timestep in the input.
+        hidden_size (int): Size of the RNN hidden state.
+    """
+    def __init__(self, input_size, hidden_size, device):
+        super(EncoderRNNCell, self).__init__()
+        self.input_size = input_size
+        self.hidden_size = hidden_size
+        self.device = device
+        self.rnn = nn.LSTM(input_size, hidden_size)
+
+    def forward(self, input, hidden):
+        output, hidden = self.rnn(input, hidden)
+        return hidden
+    
+    def initHidden(self, batch_size):
+        return torch.zeros(1, batch_size, self.hidden_size, device=self.device)

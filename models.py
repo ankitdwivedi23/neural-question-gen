@@ -37,14 +37,14 @@ class Seq2SeqGru(nn.Module):
         self.device = device
         self.Idx2Word = Idx2Word
         self.model_type = 'seq2seqGru'
-        self.teacher_forcing_ratio = 0.5
+        self.teacher_forcing_ratio = 0.
         self.SOS_token = 2
         self.EOS_token = 3
         self.EOS = "--EOS--"
 
         self. criterion = nn.NLLLoss(reduction='sum')
         self.emb = nn.Embedding(num_embeddings=output_size, embedding_dim=hidden_size, padding_idx=0)
-        self.encoder = layers.EncoderSimpleRNN(input_size=hidden_size,
+        self.encoder = layers.EncoderRNNCell(input_size=hidden_size,
                                      hidden_size=hidden_size,
                                      device=device)
 
@@ -67,10 +67,15 @@ class Seq2SeqGru(nn.Module):
         batch_size = cw_idxs.size(0)
 
         loss = 0
-        input_mask = torch.zeros_like(input_tensor) != input_tensor
-        input_len = input_mask.sum(-1)
-        input_emb =  self.emb(input_tensor)
-        encoder_hidden, dec_init_state = self.encoder(input_emb, input_len)
+        
+        encoder_hidden = self.encoder.initHidden(batch_size), self.encoder.initHidden(batch_size)
+        for ei in range(input_length):
+            input_emb =  self.emb(input_tensor[:, ei]).unsqueeze(0)
+            encoder_output, encoder_hidden = self.encoder(input_emb,
+                                                        encoder_hidden)
+            encoder_hidden = encoder_hidden[0].unsqueeze(0), encoder_hidden
+
+        dec_init_state = encoder_hidden
 
         decoder_input = torch.tensor([[self.SOS_token]*batch_size], device=self.device)
         
@@ -120,7 +125,12 @@ class Seq2SeqGru(nn.Module):
             input_len = input_mask.sum(-1)
             input_emb =  self.emb(input_tensor)
 
-            encoder_output, encoder_hidden = self.encoder(input_emb, input_len)
+            encoder_hidden = self.encoder.initHidden(batch_size), self.encoder.initHidden(batch_size)
+            for ei in range(input_length):
+                input_emb =  self.emb(input_tensor[:, ei]).unsqueeze(0)
+                encoder_output, encoder_hidden = self.encoder(input_emb,
+                                                            encoder_hidden)
+                encoder_hidden = encoder_hidden[0].unsqueeze(0), encoder_hidden
 
             decoder_input = torch.tensor([[self.SOS_token]*batch_size], device=self.device)  # SOS
 
