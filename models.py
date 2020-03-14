@@ -257,21 +257,22 @@ class TransformerModel(nn.Module):
         dim_feedforward (int): Dimension of the feedforward network model
         dropout (float): Dropout probability
     """
-    def __init__(self, word_vectors, device, d_model=512, nhead=8, num_encoder_layers=6, num_decoder_layers=6, dim_feedforward=2048, dropout=0.1):
+    def __init__(self, vocab_size, device, d_model=512, nhead=8, num_encoder_layers=6, num_decoder_layers=6, dim_feedforward=2048, dropout=0.1):
         super(TransformerModel, self).__init__()
         self.device = device
-        self.emb = layers.TransformerEmbedding(word_vectors, d_model, padding_idx=0)
+        self.src_emb = layers.TransformerEmbedding(d_model, vocab_size)
+        self.tgt_emb = layers.TransformerEmbedding(d_model, vocab_size)
         #self.emb = nn.Embedding(num_embeddings=vocab_size, embedding_dim=d_model, padding_idx=0)
         self.encoder_layer = nn.TransformerEncoderLayer(d_model, nhead, dim_feedforward, dropout)
         self.encoder = nn.TransformerEncoder(self.encoder_layer, num_encoder_layers)
         self.decoder_layer = nn.TransformerDecoderLayer(d_model, nhead, dim_feedforward)
         self.decoder = nn.TransformerDecoder(self.decoder_layer, num_decoder_layers)
-        self.generator = layers.Generator(d_model, word_vectors.size(0))
+        self.generator = layers.Generator(d_model, vocab_size)
         self.model_type = 'transformer'
 
         self._reset_parameters()
     
-    def forward(self, cw_idxs, qw_idxs):
+    def forward(self, cw_idxs, qw_idxs, c_mask, q_mask):
         """
         Args:
             cw_idxs (tensor): Padded context sequence. Shape: (batch_size, c_len)
@@ -281,24 +282,12 @@ class TransformerModel(nn.Module):
         Returns:
             log_p (tensor): log of softmax distribution of linear projection of decoder output. Shape: 
         """
-        # Chop of the EOS token.
-        #qw_idxs = qw_idxs[:, :-1]
-        #q_mask = q_mask[:, :-1]
-
-        #print("Context:")
-        #print(cw_idxs)
-
-        #print("Target:")
-        #print(qw_idxs)
-
-        c_mask = torch.zeros_like(cw_idxs) == cw_idxs
-
         enc_out = self.encode(cw_idxs, c_mask)      # (batch_size, c_len, d_model)
-        log_p = self.decode(qw_idxs, enc_out, c_mask)       # (batch_size, q_len, vocab_size)
+        log_p = self.decode(qw_idxs, enc_out, c_mask, q_mask)       # (batch_size, q_len, vocab_size)
         return log_p    
 
     def encode(self, cw_idxs, c_mask):
-        c_emb = self.emb(cw_idxs)                   # (batch_size, c_len, d_model)
+        c_emb = self.src_emb(cw_idxs)                   # (batch_size, c_len, d_model)
         c_emb = c_emb.transpose(0,1)                # (c_len, batch_size, d_model)
 
         #c_mask = c_mask.to(dtype=torch.uint8)       # (batch_size, c_len)
@@ -306,12 +295,11 @@ class TransformerModel(nn.Module):
         enc_out = self.encoder(c_emb, src_key_padding_mask=c_mask)    # (batch_size, c_len, d_model)
         return enc_out
     
-    def decode(self, qw_idxs, enc_out, c_mask):
+    def decode(self, qw_idxs, enc_out, c_mask, q_mask):
         q_mask = torch.zeros_like(qw_idxs) == qw_idxs
-        q_emb = self.emb(qw_idxs)                   # (batch_size, q_len, d_model)
+        q_emb = self.tgt_emb(qw_idxs)                   # (batch_size, q_len, d_model)
         q_emb = q_emb.transpose(0,1)                # (q_len, batch_size, d_model)
 
-        #c_mask = c_mask.to(dtype=torch.uint8)       # (batch_size, c_len) 
         self_attn_mask = self.generate_square_subsequent_mask(q_mask.size(1)).to(device=self.device)    # (q_len, q_len)
 
         dec_out = self.decoder(

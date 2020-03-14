@@ -182,9 +182,9 @@ class Generator(nn.Module):
         return F.log_softmax(self.proj(x), dim=-1)
 
 
-class TransformerEmbedding(nn.Module):
+class TransformerPreTrainedEmbedding(nn.Module):
     def __init__(self, word_vectors, d_model, padding_idx):
-        super(TransformerEmbedding, self).__init__()
+        super(TransformerPreTrainedEmbedding, self).__init__()
         #self.lut = nn.Embedding(vocab, d_model, padding_idx)
         self.d_model = d_model
         self.emb = nn.Embedding.from_pretrained(word_vectors, freeze=True, padding_idx=padding_idx)
@@ -192,3 +192,13 @@ class TransformerEmbedding(nn.Module):
 
     def forward(self, x):
         return self.proj(self.emb(x)) * math.sqrt(self.d_model)
+
+
+class TransformerEmbedding(nn.Module):
+    def __init__(self, d_model, vocab):
+        super(TransformerEmbedding, self).__init__()
+        self.lut = nn.Embedding(vocab, d_model)
+        self.d_model = d_model
+
+    def forward(self, x):
+        return self.lut(x) * math.sqrt(self.d_model)

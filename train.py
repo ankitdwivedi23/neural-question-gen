@@ -149,8 +149,8 @@ def main(args):
                     output_size=vocab_size,
                     device=device)
         elif args.model_type == "transformer":
-            #return TransformerModel(word_vectors, device)
-            return make_model(vocab_size, vocab_size, N=2)
+            return TransformerModel(vocab_size, device, num_encoder_layers=2, num_decoder_layers=2, dropout=0.0)
+            #return make_model(vocab_size, vocab_size, N=2, dropout=0.0)
 
     # Get model
     log.info('Building model...')
@@ -214,12 +214,12 @@ def main(args):
                 batch_size = re_cw_idxs.size(0)
 
                 # Setup for forward
-                #re_cw_idxs = re_cw_idxs.to(device)
-                #re_cw_idxs = torch.cat((torch.zeros((batch_size, 1), device=device, dtype=torch.long), re_cw_idxs, torch.zeros((batch_size, 1), device=device, dtype=torch.long)), dim=-1)
-                #re_cw_idxs[:,0] = 2
-                #re_cw_idxs[:,-1] = 3
-                cw_idxs = cw_idxs.to(device)
-                qw_idxs = qw_idxs.to(device)
+                re_cw_idxs = re_cw_idxs.to(device)
+                re_cw_idxs = torch.cat((torch.zeros((batch_size, 1), device=device, dtype=torch.long), re_cw_idxs, torch.zeros((batch_size, 1), device=device, dtype=torch.long)), dim=-1)
+                re_cw_idxs[:,0] = 2
+                re_cw_idxs[:,-1] = 3
+                #cw_idxs = cw_idxs.to(device)
+                #qw_idxs = qw_idxs.to(device)
 
                 optimizer.zero_grad()
 
@@ -228,25 +228,24 @@ def main(args):
                 #copy_idxs = torch.cat((torch.zeros((batch_size, 1), device=device, dtype=torch.long), re_cw_idxs, torch.zeros((batch_size, 1), device=device, dtype=torch.long)), dim=-1)
                 #copy_idxs[:,0] = 2
                 #copy_idxs[:,-1] = 3
-                copy_idxs_tgt = qw_idxs[:, :-1]
-                copy_idxs_tgt_y = qw_idxs[:, 1:]
+                copy_idxs_tgt = re_cw_idxs[:, :-1]
+                copy_idxs_tgt_y = re_cw_idxs[:, 1:]
                 #copy_idxs_tgt = re_cw_idxs
                 #copy_idxs_tgt_y = re_cw_idxs
 
-                c_mask = (cw_idxs != pad).unsqueeze(-2)
+                #c_mask = (cw_idxs != pad).unsqueeze(-2)
+                c_mask = re_cw_idxs == pad
                 copy_idxs_tgt_mask = make_std_mask(copy_idxs_tgt, pad)
-
-
-
+                
                 # Forward
 
                 if args.model_type in ['seq2seq', 'seq2seq_attn']:
                     log_p = model(re_cw_idxs, qw_idxs)                  #(batch_size, q_len, vocab_size)
                 elif args.model_type == 'transformer':
-                    log_p = model(cw_idxs, copy_idxs_tgt, c_mask, copy_idxs_tgt_mask)           #(batch_size, q_len, vocab_size)
+                    log_p = model(re_cw_idxs, copy_idxs_tgt, c_mask, copy_idxs_tgt_mask)           #(batch_size, q_len, vocab_size)
                 
                 print("Context:")
-                print(cw_idxs[0])
+                print(re_cw_idxs[0])
                 print("Question:")
                 print(copy_idxs_tgt[0])
                 print("Predicted:")
@@ -275,7 +274,7 @@ def main(args):
                 #batch_loss = F.nll_loss(log_p, qw_idxs_tgt, ignore_index=0, reduction='sum')
 
                 criterion = nn.NLLLoss(ignore_index=0, reduction='sum')
-                model_opt = NoamOpt(model.module.src_embed[0].d_model, 1, 400,
+                model_opt = NoamOpt(model.module.src_emb.d_model, 1, 400,
                                     torch.optim.Adam(model.parameters(), lr=0, betas=(0.9, 0.98), eps=1e-9))                
 
                 #loss = batch_loss / batch_size
@@ -327,7 +326,7 @@ def main(args):
                     '''
 
                     print("Context Words:")
-                    print(getWords(cw_idxs[0].squeeze().tolist()))
+                    print(getWords(re_cw_idxs[0].squeeze().tolist()))
                     #print(getWords(qw_idxs[batch_size-1].squeeze().tolist()))
                     #util.evaluateRandomly(model, word2Idx, Idx2Word, re_cw_idxs[batch_size-1].unsqueeze(0), device)
                     
@@ -336,7 +335,8 @@ def main(args):
 
                     print("Predicted Words:")
                     model.eval()
-                    predicted_words = util.greedy_decode(model, cw_idxs[0].unsqueeze(0), c_mask[0].unsqueeze(0), max_len=30, start_symbol=2)
+                    #predicted_words = util.greedy_decode(model, cw_idxs[0].unsqueeze(0), c_mask[0].unsqueeze(0), max_len=30, start_symbol=2)
+                    predicted_words = util.greedy_decode(model, re_cw_idxs[0].unsqueeze(0), c_mask[0].unsqueeze(0), max_len=30, start_symbol=2)
                     print(predicted_words)
                     print(getWords(predicted_words.squeeze().tolist()))
                     model.train()

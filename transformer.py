@@ -16,9 +16,10 @@ def subsequent_mask(size):
 
 def make_std_mask(tgt, pad):
     "Create a mask to hide padding and future words."
-    tgt_mask = (tgt != pad).unsqueeze(-2)
-    sub_mask = subsequent_mask(tgt.size(-1)).type_as(tgt_mask.data)
-    tgt_mask = tgt_mask & sub_mask
+    tgt_mask = tgt == pad
+    #tgt_mask = (tgt != pad).unsqueeze(-2)
+    #sub_mask = subsequent_mask(tgt.size(-1)).type_as(tgt_mask.data)
+    #tgt_mask = tgt_mask & sub_mask
     return tgt_mask
 
 def attention(query, key, value, mask=None, dropout=None):
@@ -34,7 +35,7 @@ def attention(query, key, value, mask=None, dropout=None):
     return torch.matmul(p_attn, value), p_attn
 
 def make_model(src_vocab, tgt_vocab, N=6, 
-               d_model=512, d_ff=2048, h=8, dropout=0.0):
+               d_model=512, d_ff=2048, h=8, dropout=0.1):
     "Helper: Construct a model from hyperparameters."
     c = copy.deepcopy
     attn = MultiHeadedAttention(h, d_model)
