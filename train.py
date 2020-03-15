@@ -464,8 +464,9 @@ def evaluate(model, data_loader, device, use_squad_v2):
             #loss = F.nll_loss(log_p, qw_idxs_target, ignore_index=0, reduction='sum')
             
             batch_loss = loss_compute(log_p, tgt_idxs_y, batch_words, model.training)
+            loss_val = batch_loss / batch_words
             
-            nll_meter.update(batch_loss, batch_words)
+            nll_meter.update(loss_val, batch_words)
 
             # Calculate perplexity        
             total_loss += batch_loss            
