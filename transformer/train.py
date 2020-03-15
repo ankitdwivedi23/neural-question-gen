@@ -149,7 +149,7 @@ def main(args):
                     output_size=vocab_size,
                     device=device)
         elif args.model_type == "transformer":
-            return TransformerModel(vocab_size, device, num_encoder_layers=2, num_decoder_layers=2, dropout=0.1)
+            return TransformerModel(vocab_size, device, num_encoder_layers=6, num_decoder_layers=6, dropout=0.1)
             #return make_model(vocab_size, vocab_size, N=2, dropout=0.0)
 
     # Get model
@@ -224,13 +224,7 @@ def main(args):
 
                 # Setup for forward
                 src_idxs = cw_idxs
-                src_idxs = torch.cat((torch.zeros((batch_size, 1), device=device, dtype=torch.long), src_idxs, torch.zeros((batch_size, 1), device=device, dtype=torch.long)), dim=-1)
-                src_idxs[:,0] = SOS
-                src_idxs[:,-1] = EOS
-                
-
-                #optimizer.zero_grad()
-
+                #src_idxs = torch.cat((torch.zeros((batch_size, 1), device=device, dtype=torch.long), src_idxs, torch.zeros((batch_size, 1), device=device, dtype=torch.long)), dim=-1)
                 tgt_idxs = qw_idxs[:, :-1]
                 tgt_idxs_y = qw_idxs[:, 1:]
                 
@@ -443,9 +437,7 @@ def evaluate(model, data_loader, device, use_squad_v2):
             
             # Setup for forward
             src_idxs = cw_idxs
-            src_idxs = torch.cat((torch.zeros((batch_size, 1), device=device, dtype=torch.long), src_idxs, torch.zeros((batch_size, 1), device=device, dtype=torch.long)), dim=-1)
-            src_idxs[:,0] = SOS
-            src_idxs[:,-1] = EOS        
+            #src_idxs = torch.cat((torch.zeros((batch_size, 1), device=device, dtype=torch.long), src_idxs, torch.zeros((batch_size, 1), device=device, dtype=torch.long)), dim=-1)   
             tgt_idxs = qw_idxs[:, :-1]
             tgt_idxs_y = qw_idxs[:, 1:]
 
