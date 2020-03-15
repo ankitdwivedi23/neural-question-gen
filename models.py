@@ -109,6 +109,9 @@ class Seq2SeqGru(nn.Module):
             input_length = input_tensor.size(1)
             batch_size = cw_idxs.size(0)
 
+            print(self.device)
+            input("Jai Shri Ram") 
+            
             encoder_hidden = self.encoder.initHidden(batch_size), self.encoder.initHidden(batch_size)
             for ei in range(input_length):
                 encoder_output, encoder_hidden = self.encoder(input_tensor[:, ei].unsqueeze(0), encoder_hidden)
