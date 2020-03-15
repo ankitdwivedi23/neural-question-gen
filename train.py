@@ -242,21 +242,11 @@ def main(args):
                 # Forward
 
                 if args.model_type in ['seq2seq', 'seq2seq_attn']:
-                    log_p = model(src_idxs, tgt_idxs)                  #(batch_size, q_len, vocab_size)
+                    log_p = model(src_idxs, tgt_idxs)                               #(batch_size, q_len, vocab_size)
                 elif args.model_type == 'transformer':
                     log_p = model(src_idxs, tgt_idxs, src_mask, tgt_mask)           #(batch_size, q_len, vocab_size)
-                
-                print("Context:")
-                print(src_idxs[0])
-                print("Question:")
-                print(tgt_idxs[0])
-                print("Predicted:")
-                #print(log_p[0].shape)
-                print(log_p[0].argmax(-1))
 
-                #print(log_p.shape)
                 log_p = log_p.contiguous().view(-1, log_p.size(-1))
-                #print(log_p.shape)
 
                 
                 #qw_idxs_tgt = qw_idxs[:, 1:]     # omitting leading `SOS`
@@ -282,7 +272,6 @@ def main(args):
                 #optimizer.step()
                 
                 batch_words = torch.sum(tgt_len).item()
-                #print(f"Num of words: {tgt_words_num_to_predict}")
                 report_words += batch_words
                 total_words += batch_words
                 report_examples += batch_size
@@ -318,9 +307,12 @@ def main(args):
                                                                                          time.time() - begin_time))
                     '''
 
+                    '''
+                    CHECK OUTPUT
+
                     print("Context Words:")
                     print(getWords(src_idxs[0].squeeze().tolist()))
-                    #print(getWords(qw_idxs[batch_size-1].squeeze().tolist()))
+
                     #util.evaluateRandomly(model, word2Idx, Idx2Word, re_cw_idxs[batch_size-1].unsqueeze(0), device)
                     
                     print("Question Words:")
@@ -332,6 +324,7 @@ def main(args):
                     print(predicted_words)
                     print(getWords(predicted_words.squeeze().tolist()))
                     model.train()
+                    '''
 
 
                     log.info('epoch %d, iter %d, avg. loss %.2f, avg. ppl %.2f ' \
