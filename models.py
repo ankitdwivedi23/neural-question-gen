@@ -265,7 +265,6 @@ class TransformerModel(nn.Module):
         self.device = device
         self.src_embed = nn.Sequential(layers.TransformerEmbedding(d_model, vocab_size), c(position))
         self.tgt_embed = nn.Sequential(layers.TransformerEmbedding(d_model, vocab_size), c(position))
-        #self.emb = nn.Embedding(num_embeddings=vocab_size, embedding_dim=d_model, padding_idx=0)
         self.encoder_layer = nn.TransformerEncoderLayer(d_model, nhead, dim_feedforward, dropout)
         self.encoder = nn.TransformerEncoder(self.encoder_layer, num_encoder_layers)
         self.decoder_layer = nn.TransformerDecoderLayer(d_model, nhead, dim_feedforward, dropout)
@@ -285,22 +284,20 @@ class TransformerModel(nn.Module):
         Returns:
             log_p (tensor): log of softmax distribution of linear projection of decoder output. Shape: 
         """
-        enc_out = self.encode(cw_idxs, c_mask)      # (batch_size, c_len, d_model)
+        enc_out = self.encode(cw_idxs, c_mask)                      # (batch_size, c_len, d_model)
         log_p = self.decode(qw_idxs, enc_out, c_mask, q_mask)       # (batch_size, q_len, vocab_size)
         return log_p    
 
     def encode(self, cw_idxs, c_mask):
-        c_emb = self.src_embed(cw_idxs)                   # (batch_size, c_len, d_model)
-        c_emb = c_emb.transpose(0,1)                # (c_len, batch_size, d_model)
+        c_emb = self.src_embed(cw_idxs)                             # (batch_size, c_len, d_model)
+        c_emb = c_emb.transpose(0,1)                                # (c_len, batch_size, d_model)
 
-        #c_mask = c_mask.to(dtype=torch.uint8)       # (batch_size, c_len)
-
-        enc_out = self.encoder(c_emb, src_key_padding_mask=c_mask)    # (batch_size, c_len, d_model)
+        enc_out = self.encoder(c_emb, src_key_padding_mask=c_mask)  # (c_len, batch_size, d_model)
         return enc_out
     
     def decode(self, qw_idxs, enc_out, c_mask, q_mask):
-        q_emb = self.tgt_embed(qw_idxs)                   # (batch_size, q_len, d_model)
-        q_emb = q_emb.transpose(0,1)                # (q_len, batch_size, d_model)
+        q_emb = self.tgt_embed(qw_idxs)                             # (batch_size, q_len, d_model)
+        q_emb = q_emb.transpose(0,1)                                # (q_len, batch_size, d_model)
 
         self_attn_mask = self.generate_square_subsequent_mask(qw_idxs.size(1)).to(device=self.device)    # (q_len, q_len)
 
@@ -310,25 +307,9 @@ class TransformerModel(nn.Module):
             tgt_mask=self_attn_mask,
             tgt_key_padding_mask=q_mask,
             memory_key_padding_mask=c_mask)     # (q_len, batch_size, d_model)
-        log_p = self.generator(dec_out)         # (q_len, batch_size, vocab_size)
-        
-        '''
-        enc_out = enc_out.transpose(0,1)
-        print("Encoder Output...")
-        print(enc_out[7][0])
-
-        dec_out = dec_out.transpose(0,1)        
-        print("Decoder Output...")
-        print(dec_out[7][0])
-        
-        print("Softmax Output...")
-        print(log_p[7][0])
-        '''
-        #print("Softmax argmax")
+        log_p = self.generator(dec_out)         # (q_len, batch_size, vocab_size)        
         log_p = log_p.transpose(0,1)
-        #print(log_p.argmax(-1))
-
-        return log_p            # (batch_size, q_len, vocab_size)
+        return log_p                            # (batch_size, q_len, vocab_size)
     
 
     def _reset_parameters(self):

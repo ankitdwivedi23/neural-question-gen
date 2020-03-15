@@ -32,6 +32,9 @@ from util import collate_fn, SQuAD
 
 from transformer import make_model, make_std_mask
 
+PAD = 0
+SOS = 2
+EOS = 3
 
 class NoamOpt:
     "Optim wrapper that implements rate."
@@ -67,16 +70,17 @@ class SimpleLossCompute:
         self.criterion = criterion
         self.opt = opt
         
-    def __call__(self, x, y, norm):
+    def __call__(self, x, y, norm, is_training):
         #x = x.contiguous().view(-1, x.size(-1))
         #y = y.contiguous().view(-1)
 
         loss = self.criterion(x, y) / norm
-        loss.backward()
 
-        if self.opt is not None:
-            self.opt.step()
-            self.opt.optimizer.zero_grad()            
+        if is_training:
+            loss.backward()
+            if self.opt is not None:
+                self.opt.step()
+                self.opt.optimizer.zero_grad()            
         return loss.item() * norm
 
 
@@ -123,12 +127,7 @@ def main(args):
     log.info('Loading word2Idx...')
     word2Idx = json.loads(open(args.word2idx_file).read())
     Idx2Word = {v: k for (k,v) in word2Idx.items()}
-    #for idx in [2251, 1280,  724,   19,   27,  338, 1733,   28, 1415,    9,  163,  4, 1062,    4,    7, 2409,    4,   32,  124,   32,  873, 1888, 7, 2107, 5,  217]:
-    #    print(Idx2Word[idx])
-    print("2251 is ...")
-    print(Idx2Word[2251])
-        
-
+    
     vocab_size = len(word2Idx)
     print(f"Vocab Size is : {vocab_size}")
 
@@ -164,11 +163,7 @@ def main(args):
     else:
         step = 0
     model = model.to(device)
-    model.train()
-
-    criterion = nn.NLLLoss(ignore_index=0, reduction='sum')
-    model_opt = NoamOpt(model.module.src_embed[0].d_model, 1, 400,
-                        torch.optim.Adam(model.parameters(), lr=0, betas=(0.9, 0.98), eps=1e-9))
+    model.train()      
 
     # Get saver
     saver = util.CheckpointSaver(args.save_dir,
@@ -180,9 +175,15 @@ def main(args):
 
     model_save_path = os.path.join(args.save_dir, args.best_model_name)
 
-    # Get optimizer and scheduler    
+    # Initialize optimizer and loss function
+    optimizer = NoamOpt(model.module.src_embed[0].d_model, 1, 400,
+                                    torch.optim.Adam(model.parameters(), lr=0, betas=(0.9, 0.98), eps=1e-9))
+
+    criterion = nn.NLLLoss(ignore_index=PAD, reduction='sum')
+    loss_compute = SimpleLossCompute(criterion, optimizer)    
+    
     # Default project starter code uses Adadelta, but we're going to use Adam
-    #optimizer = torch.optim.Adam(model.parameters(), lr=float(args.lr))
+    # optimizer = torch.optim.Adam(model.parameters(), lr=float(args.lr))
 
     num_trial = 0
     train_iter = patience = total_loss = report_loss = total_words = report_words = 0
@@ -209,7 +210,6 @@ def main(args):
     epoch = step // len(train_dataset)
     while epoch != args.num_epochs:
         epoch += 1
-        loss_compute = SimpleLossCompute(criterion, model_opt)
         log.info(f'Starting epoch {epoch}...')
         with torch.enable_grad(), \
                 tqdm(total=len(train_loader.dataset)) as progress_bar:
@@ -217,44 +217,40 @@ def main(args):
                 
                 train_iter += 1
 
-                batch_size = re_cw_idxs.size(0)
+                cw_idxs = cw_idxs.to(device)
+                re_cw_idxs = re_cw_idxs.to(device)
+                qw_idxs = qw_idxs.to(device)
+
+                batch_size = cw_idxs.size(0)               
 
                 # Setup for forward
-                re_cw_idxs = re_cw_idxs.to(device)
-                re_cw_idxs = torch.cat((torch.zeros((batch_size, 1), device=device, dtype=torch.long), re_cw_idxs, torch.zeros((batch_size, 1), device=device, dtype=torch.long)), dim=-1)
-                re_cw_idxs[:,0] = 2
-                re_cw_idxs[:,-1] = 3
-                #cw_idxs = cw_idxs.to(device)
-                qw_idxs = qw_idxs.to(device)
+                src_idxs = re_cw_idxs
+                src_idxs = torch.cat((torch.zeros((batch_size, 1), device=device, dtype=torch.long), src_idxs, torch.zeros((batch_size, 1), device=device, dtype=torch.long)), dim=-1)
+                src_idxs[:,0] = SOS
+                src_idxs[:,-1] = EOS
+                
 
                 #optimizer.zero_grad()
 
-                pad = 0
-
-                #copy_idxs = torch.cat((torch.zeros((batch_size, 1), device=device, dtype=torch.long), re_cw_idxs, torch.zeros((batch_size, 1), device=device, dtype=torch.long)), dim=-1)
-                #copy_idxs[:,0] = 2
-                #copy_idxs[:,-1] = 3
-                copy_idxs_tgt = qw_idxs[:, :-1]
-                copy_idxs_tgt_y = qw_idxs[:, 1:]
-                #copy_idxs_tgt = re_cw_idxs
-                #copy_idxs_tgt_y = re_cw_idxs
-
-                #c_mask = (re_cw_idxs != pad).unsqueeze(-2)
-                c_mask = re_cw_idxs == pad
+                tgt_idxs = qw_idxs[:, :-1]
+                tgt_idxs_y = qw_idxs[:, 1:]
+                
+                #c_mask = (cw_idxs != pad).unsqueeze(-2)
+                src_mask = src_idxs == PAD
+                tgt_mask = tgt_idxs == PAD
                 #copy_idxs_tgt_mask = make_std_mask(copy_idxs_tgt, pad)
-                copy_idxs_tgt_mask = copy_idxs_tgt == pad
                 
                 # Forward
 
                 if args.model_type in ['seq2seq', 'seq2seq_attn']:
-                    log_p = model(re_cw_idxs, qw_idxs)                  #(batch_size, q_len, vocab_size)
+                    log_p = model(src_idxs, tgt_idxs)                  #(batch_size, q_len, vocab_size)
                 elif args.model_type == 'transformer':
-                    log_p = model(re_cw_idxs, copy_idxs_tgt, c_mask, copy_idxs_tgt_mask)           #(batch_size, q_len, vocab_size)
+                    log_p = model(src_idxs, tgt_idxs, src_mask, tgt_mask)           #(batch_size, q_len, vocab_size)
                 
                 print("Context:")
-                print(re_cw_idxs[0])
+                print(src_idxs[0])
                 print("Question:")
-                print(copy_idxs_tgt[0])
+                print(tgt_idxs[0])
                 print("Predicted:")
                 #print(log_p[0].shape)
                 print(log_p[0].argmax(-1))
@@ -272,13 +268,11 @@ def main(args):
                 #q_tgt_mask = torch.zeros_like(qw_idxs_tgt) != qw_idxs_tgt
                 #q_len = q_tgt_mask.sum(-1)
 
-                copy_idxs_tgt_y = copy_idxs_tgt_y.contiguous().view(-1)
-                tgt_mask = torch.zeros_like(copy_idxs_tgt_y) != copy_idxs_tgt_y
-                tgt_len = tgt_mask.sum(-1)
-
+                tgt_idxs_y = tgt_idxs_y.contiguous().view(-1)
+                tgt_no_pad = tgt_idxs_y != PAD
+                tgt_len = tgt_no_pad.sum(-1)                
                 
-                
-                #batch_loss = F.nll_loss(log_p, qw_idxs_tgt, ignore_index=0, reduction='sum')               
+                #batch_loss = F.nll_loss(log_p, qw_idxs_tgt, ignore_index=0, reduction='sum')      
 
                 #loss = batch_loss / batch_size
                 #loss_val = loss.item()
@@ -295,7 +289,7 @@ def main(args):
                 report_examples += batch_size
                 total_examples += batch_size
 
-                batch_loss = loss_compute(log_p, copy_idxs_tgt_y, batch_words)
+                batch_loss = loss_compute(log_p, tgt_idxs_y, batch_words, model.training)
                 
                 '''
                 model_opt.optimizer.zero_grad()
@@ -326,17 +320,16 @@ def main(args):
                     '''
 
                     print("Context Words:")
-                    print(getWords(re_cw_idxs[0].squeeze().tolist()))
+                    print(getWords(src_idxs[0].squeeze().tolist()))
                     #print(getWords(qw_idxs[batch_size-1].squeeze().tolist()))
                     #util.evaluateRandomly(model, word2Idx, Idx2Word, re_cw_idxs[batch_size-1].unsqueeze(0), device)
                     
                     print("Question Words:")
-                    print(getWords(copy_idxs_tgt[0].squeeze().tolist()))
+                    print(getWords(tgt_idxs[0].squeeze().tolist()))
 
                     print("Predicted Words:")
                     model.eval()
-                    #predicted_words = util.greedy_decode(model, cw_idxs[0].unsqueeze(0), c_mask[0].unsqueeze(0), max_len=30, start_symbol=2)
-                    predicted_words = util.greedy_decode(model, re_cw_idxs[0].unsqueeze(0), c_mask[0].unsqueeze(0), max_len=30, start_symbol=2)
+                    predicted_words = util.greedy_decode(model, src_idxs[0].unsqueeze(0), src_mask[0].unsqueeze(0), max_len=30, start_symbol=2)
                     print(predicted_words)
                     print(getWords(predicted_words.squeeze().tolist()))
                     model.train()
@@ -424,35 +417,48 @@ def evaluate(model, data_loader, device, use_squad_v2):
     was_training = model.training
     model.eval()
 
-    cum_loss = 0.
-    cum_tgt_words = 0.
+    total_loss = 0.
+    total_words = 0.
+
+    criterion = nn.NLLLoss(ignore_index=PAD, reduction='sum')
+    loss_compute = SimpleLossCompute(criterion)
 
     # no_grad() signals backend to throw away all gradients
     with torch.no_grad():
         for cw_idxs, re_cw_idxs, cc_idxs, qw_idxs, qc_idxs, y1, y2, ids in data_loader:
-            # Setup for forward
+            
+            cw_idxs = cw_idxs.to(device)
             re_cw_idxs = re_cw_idxs.to(device)
             qw_idxs = qw_idxs.to(device)
             batch_size = cw_idxs.size(0)
             
-            # Forward
-            log_p = model(cw_idxs, qw_idxs)        #(batch_size, q_len, vocab_size)
-                
-            log_p = log_p.contiguous().view(log_p.size(0) * log_p.size(1), log_p.size(2))
-            qw_idxs_target = qw_idxs[:, 1:]     # omitting leading `SOS`
-            qw_idxs_target = qw_idxs_target.contiguous().view(qw_idxs_target.size(0) * qw_idxs_target.size(1))
-            loss = F.nll_loss(log_p, qw_idxs_target, ignore_index=0, reduction='sum')
-            nll_meter.update(loss.item(), batch_size)
+            # Setup for forward
+            src_idxs = re_cw_idxs           
+            tgt_idxs = qw_idxs[:, :-1]
+            tgt_idxs_y = qw_idxs[:, 1:] 
 
-            q_mask = torch.zeros_like(qw_idxs_target) != qw_idxs_target
-            q_len = q_mask.sum(-1)
+            # Forward
+            log_p = model(src_idxs, tgt_idxs)        #(batch_size, q_len, vocab_size)                
+            log_p = log_p.contiguous().view(-1, log_p.size(-1))
+
+            tgt_idxs_y = tgt_idxs_y.contiguous().view(-1)
+
+            tgt_no_pad = torch.zeros_like(tgt_idxs) != tgt_idxs
+            tgt_len = tgt_no_pad.sum(-1)
+            batch_words = torch.sum(tgt_len).item()
+            #loss = F.nll_loss(log_p, qw_idxs_target, ignore_index=0, reduction='sum')
+            
+            batch_loss = loss_compute(log_p, tgt_idxs_y, batch_words, model.training)
+            
+            nll_meter.update(batch_loss, batch_size)
+
+            
 
             # Calculate perplexity        
-            cum_loss += loss.item()
-            tgt_word_num_to_predict = torch.sum(q_len).item()
-            cum_tgt_words += tgt_word_num_to_predict
+            total_loss += batch_loss            
+            total_words += batch_words
 
-        ppl = np.exp(cum_loss / cum_tgt_words)
+        ppl = np.exp(total_loss / total_words)
 
     results_list = [('NLL', nll_meter.avg), \
                 ('PPL', ppl)]
