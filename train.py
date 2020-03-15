@@ -347,6 +347,10 @@ def gruMain(args):
                 batch_loss = model(re_cw_idxs, re_cw_idxs[:, 0:2])
                 loss = batch_loss / batch_size
 
+                idx = re_cw_idxs[batch_size-1]
+                print(getWords(idx.squeeze().tolist()))
+                print(model.evaluate(idx.unsqueeze(0)))
+
                 # Log info
                 progress_bar.update(batch_size)
                 progress_bar.set_postfix(epoch=epoch,
@@ -354,18 +358,6 @@ def gruMain(args):
 
         if epoch == args.num_epochs:
             log.info('reached maximum number of epochs!')
-    # Evaluate 
-    log.info('Evaluate over dev')
-    for cw_idxs, re_cw_idxs, cc_idxs, qw_idxs, qc_idxs, y1, y2, ids in dev_loader:
-        for idx in re_cw_idxs:
-            print(getWords(idx.squeeze().tolist()))
-            print(model.evaluate(idx.unsqueeze(0)))
-    
-    log.info('Evaluate over train')
-    for cw_idxs, re_cw_idxs, cc_idxs, qw_idxs, qc_idxs, y1, y2, ids in train_loader:
-        for idx in re_cw_idxs:
-            print(getWords(idx.squeeze().tolist()))
-            print(model.evaluate(idx.unsqueeze(0)))
 
 
 def evaluate(model, data_loader, device, use_squad_v2):
