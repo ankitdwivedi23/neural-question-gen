@@ -149,7 +149,7 @@ def main(args):
                     output_size=vocab_size,
                     device=device)
         elif args.model_type == "transformer":
-            return TransformerModel(vocab_size, device, num_encoder_layers=2, num_decoder_layers=2, dropout=0.0)
+            return TransformerModel(vocab_size, device, num_encoder_layers=6, num_decoder_layers=6, dropout=0.1)
             #return make_model(vocab_size, vocab_size, N=2, dropout=0.0)
 
     # Get model
@@ -176,7 +176,7 @@ def main(args):
     model_save_path = os.path.join(args.save_dir, args.best_model_name)
 
     # Initialize optimizer and loss function
-    optimizer = NoamOpt(model.module.src_embed[0].d_model, 1, 400,
+    optimizer = NoamOpt(model.module.src_embed[0].d_model, 1, 2000,
                                     torch.optim.Adam(model.parameters(), lr=0, betas=(0.9, 0.98), eps=1e-9))
 
     criterion = nn.NLLLoss(ignore_index=PAD, reduction='sum')
@@ -246,12 +246,14 @@ def main(args):
                 elif args.model_type == 'transformer':
                     log_p = model(src_idxs, tgt_idxs, src_mask, tgt_mask)           #(batch_size, q_len, vocab_size)
 
+                '''
                 print("Context:")
                 print(src_idxs[0])
                 print("Question:")
                 print(tgt_idxs[0])
                 print("Predicted:")
                 print(log_p[0].argmax(-1))
+                '''
 
                 log_p = log_p.contiguous().view(-1, log_p.size(-1))
 
@@ -313,6 +315,7 @@ def main(args):
                                                                                          report_tgt_words / (time.time() - train_time),
                                                                                          time.time() - begin_time))
                     '''
+                    '''
                     print("Context Words:")
                     print(getWords(src_idxs[0].squeeze().tolist()))
 
@@ -327,6 +330,7 @@ def main(args):
                     print(predicted_words)
                     print(getWords(predicted_words.squeeze().tolist()))
                     model.train()
+                    '''
                     
 
 
