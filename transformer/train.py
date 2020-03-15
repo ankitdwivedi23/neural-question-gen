@@ -49,11 +49,14 @@ class NoamOpt:
     def step(self):
         "Update parameters and rate"
         self._step += 1
-        rate = self.rate()
-        for p in self.optimizer.param_groups:
-            p['lr'] = rate
-        self._rate = rate
-        self.optimizer.step()
+        if self._step % 4 == 0:
+            rate = self.rate()
+            for p in self.optimizer.param_groups:
+                p['lr'] = rate
+            self._rate = rate
+            self.optimizer.step()
+            return True
+        return False
         
     def rate(self, step = None):
         "Implement `lrate` above"
@@ -79,8 +82,8 @@ class SimpleLossCompute:
         if is_training:
             loss.backward()
             if self.opt is not None:
-                self.opt.step()
-                self.opt.optimizer.zero_grad()            
+                if self.opt.step():
+                    self.opt.optimizer.zero_grad()            
         return loss.item() * norm
 
 
