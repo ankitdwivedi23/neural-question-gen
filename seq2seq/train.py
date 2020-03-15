@@ -239,20 +239,17 @@ def main(args):
                                                                                          time.time() - begin_time))
                     '''
 
-                    '''
                     print("Context Words:")
-                    print(getWords(src_idxs[0].squeeze().tolist()))
-
-                    #util.evaluateRandomly(model, word2Idx, Idx2Word, re_cw_idxs[batch_size-1].unsqueeze(0), device)
+                    print(getWords(src_idxs[0].squeeze().tolist()))                    
                     
                     print("Question Words:")
                     print(getWords(tgt_idxs[0].squeeze().tolist()))
 
                     print("Predicted Words:")
                     model.eval()
-                    predicted_words = util.greedy_decode(model, src_idxs[0].unsqueeze(0), src_mask[0].unsqueeze(0), max_len=30, start_symbol=2)
-                    print(predicted_words)
-                    print(getWords(predicted_words.squeeze().tolist()))
+                    predicted_idxs = util.greedyDecode(model, word2Idx, Idx2Word, src_idxs[0].unsqueeze(0), device)
+                    print(predicted_idxs)
+                    print(getWords(predicted_idxs))
                     model.train()
                     '''
                     log.info('epoch %d, iter %d, avg. loss %.2f, avg. ppl %.2f ' \
@@ -270,6 +267,7 @@ def main(args):
                     #print(getWords(qw_idxs[batch_size-1].squeeze().tolist()))
                     #util.evaluateRandomly(model, word2Idx, Idx2Word, re_cw_idxs[batch_size-1].unsqueeze(0), device)
                 
+                '''
                 '''
                 # perform validation
                 if train_iter % args.valid_niter == 0:
@@ -472,4 +470,4 @@ def evaluate(model, data_loader, device, use_squad_v2):
     return results
 
 if __name__ == '__main__':
-    gruMain(get_train_args())
+    main(get_train_args())

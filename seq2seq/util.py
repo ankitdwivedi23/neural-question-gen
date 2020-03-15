@@ -49,7 +49,7 @@ class SQuAD(data.Dataset):
 
         dataset = np.load(data_path)
         self.context_idxs = torch.from_numpy(dataset['context_idxs']).long()
-        self.reduced_context_idxs = torch.from_numpy(dataset['reduced_context_idxs'])
+        #self.reduced_context_idxs = torch.from_numpy(dataset['reduced_context_idxs'])
         self.context_char_idxs = torch.from_numpy(dataset['context_char_idxs']).long()
         self.question_idxs = torch.from_numpy(dataset['ques_idxs']).long()
         self.question_char_idxs = torch.from_numpy(dataset['ques_char_idxs']).long()
@@ -73,12 +73,11 @@ class SQuAD(data.Dataset):
         # SQuAD 1.1: Ignore no-answer examples
         self.ids = torch.from_numpy(dataset['ids']).long()
         self.valid_idxs = [idx for idx in range(len(self.ids))
-                           if use_v2 or self.y1s[idx].item() >= 0]
+                           if use_v2 or 'test' in data_path or self.y1s[idx].item() >= 0]
 
     def __getitem__(self, idx):
         idx = self.valid_idxs[idx]
         example = (self.context_idxs[idx],
-                   self.reduced_context_idxs[idx],
                    self.context_char_idxs[idx],
                    self.question_idxs[idx],
                    self.question_char_idxs[idx],
@@ -130,13 +129,13 @@ def collate_fn(examples):
         return padded
 
     # Group by tensor type
-    context_idxs, reduced_context_idxs, context_char_idxs, \
+    context_idxs, context_char_idxs, \
         question_idxs, question_char_idxs, \
         y1s, y2s, ids = zip(*examples)
 
     # Merge into batch tensors
     context_idxs = merge_1d(context_idxs)
-    reduced_context_idxs = merge_1d(reduced_context_idxs)
+    #reduced_context_idxs = merge_1d(reduced_context_idxs)
     context_char_idxs = merge_2d(context_char_idxs)
     question_idxs = merge_1d(question_idxs)
     question_char_idxs = merge_2d(question_char_idxs)
@@ -144,7 +143,7 @@ def collate_fn(examples):
     y2s = merge_0d(y2s)
     ids = merge_0d(ids)
 
-    return (context_idxs, reduced_context_idxs, context_char_idxs,
+    return (context_idxs, context_char_idxs,
             question_idxs, question_char_idxs,
             y1s, y2s, ids)
 
@@ -590,7 +589,7 @@ def TeacherForce(model, word2idx_dict, idx2word_dict, cw_idx, qw_idx, device):
 
     print(sent)
 
-def evaluateRandomly(model, word2idx_dict, idx2word_dict, cw_idx, device):
+def greedyDecode(model, word2idx_dict, idx2word_dict, cw_idx, device):
     SOS = "--SOS--"
     EOS = "--EOS--"
     max_len = 10
@@ -606,22 +605,21 @@ def evaluateRandomly(model, word2idx_dict, idx2word_dict, cw_idx, device):
 
     t = 0
     sent = []
+    pred_idxs = []
 
     while prev_word != EOS and t < max_len:
         sent.append(prev_word)
         eos_id = word2idx_dict[EOS] 
         y_tm1 = torch.tensor([[word2idx_dict[prev_word]]], dtype=torch.long, device=device)
-
-        if model.module.model_type in ['seq2seq', 'seq2seq_attn']:
-            h_t, log_p_t  = model.module.decode(h_t, y_tm1)
-        elif model.module.model_type == 'transformer':
-            #TODO: add code for transformer
-            pass
-        
-        prev_word = idx2word_dict[log_p_t.argmax(-1).squeeze().tolist()]
+        h_t, log_p_t  = model.module.decode(h_t, y_tm1)
+        pred_idx = log_p_t.argmax(-1).squeeze().item()
+        pred_idxs.append(pred_idx)
+        #prev_word = idx2word_dict[log_p_t.argmax(-1).squeeze().tolist()]
+        prev_word = idx2word_dict[pred_idx]
         t = t+1
-
-    print(sent)
+    
+    return pred_idxs
+    #print(sent)
 
 def evaluate(model, word2idx_dict, idx2word_dict, cw_idx, device):
     SOS = "--SOS--"
