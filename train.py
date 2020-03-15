@@ -149,7 +149,7 @@ def main(args):
                     output_size=vocab_size,
                     device=device)
         elif args.model_type == "transformer":
-            return TransformerModel(vocab_size, device, num_encoder_layers=6, num_decoder_layers=6, dropout=0.1)
+            return TransformerModel(vocab_size, device, num_encoder_layers=2, num_decoder_layers=2, dropout=0.1)
             #return make_model(vocab_size, vocab_size, N=2, dropout=0.0)
 
     # Get model
@@ -350,7 +350,7 @@ def main(args):
                     print('begin validation ...', file=sys.stderr)
                      # compute dev metrics
                     results = evaluate(model, dev_loader, device, args.use_squad_v2)
-                    log.info('validation: iter %d, dev. ppl %f' % (train_iter, results[args.metric_name]))
+                    log.info('validation: iter %d, dev avg. loss %.2f, dev. ppl %f' % (train_iter, results['NLL'], results['PPL']))
 
                     if saver.is_best(results[args.metric_name]):
                         log.info('save currently the best model to [%s]' % model_save_path)
@@ -465,15 +465,16 @@ def evaluate(model, data_loader, device, use_squad_v2):
             
             batch_loss = loss_compute(log_p, tgt_idxs_y, batch_words, model.training)
             
-            nll_meter.update(batch_loss, batch_size)
+            nll_meter.update(batch_loss, batch_words)
 
             # Calculate perplexity        
             total_loss += batch_loss            
             total_words += batch_words
 
         ppl = np.exp(total_loss / total_words)
+        avg_loss = nll_meter.avg
 
-    results_list = [('NLL', nll_meter.avg), \
+    results_list = [('NLL', avg_loss), \
                 ('PPL', ppl)]
     results = OrderedDict(results_list)
 
