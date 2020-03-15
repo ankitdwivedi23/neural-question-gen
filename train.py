@@ -344,14 +344,14 @@ def gruMain(args):
 
                 # Forward
 
-                batch_loss = model(re_cw_idxs, re_cw_idxs[:, 0:2])
+                batch_loss = model(re_cw_idxs, re_cw_idxs[:, 0:1])
                 loss = batch_loss / batch_size
 
                 # Evaluate on Train
                 if epoch == args.num_epochs-1:
                     for i in range(batch_size):
                         idx = re_cw_idxs[i]
-                        print(getWords(idx.squeeze().tolist()))
+                        print("Expected : " + str(getWords([idx[0:1].squeeze().tolist()])))
                         print(model.evaluate(idx.unsqueeze(0)))
 
                 # Log info
