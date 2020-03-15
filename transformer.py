@@ -16,10 +16,10 @@ def subsequent_mask(size):
 
 def make_std_mask(tgt, pad):
     "Create a mask to hide padding and future words."
-    tgt_mask = tgt == pad
-    #tgt_mask = (tgt != pad).unsqueeze(-2)
-    #sub_mask = subsequent_mask(tgt.size(-1)).type_as(tgt_mask.data)
-    #tgt_mask = tgt_mask & sub_mask
+    #tgt_mask = tgt == pad
+    tgt_mask = (tgt != pad).unsqueeze(-2)
+    sub_mask = subsequent_mask(tgt.size(-1)).type_as(tgt_mask.data)
+    tgt_mask = tgt_mask & sub_mask
     return tgt_mask
 
 def attention(query, key, value, mask=None, dropout=None):

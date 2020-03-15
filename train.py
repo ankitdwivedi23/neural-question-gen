@@ -150,8 +150,8 @@ def main(args):
                     output_size=vocab_size,
                     device=device)
         elif args.model_type == "transformer":
-            return TransformerModel(vocab_size, device, num_encoder_layers=2, num_decoder_layers=2, dropout=0.0)
-            #return make_model(vocab_size, vocab_size, N=2, dropout=0.0)
+            #return TransformerModel(vocab_size, device, num_encoder_layers=2, num_decoder_layers=2, dropout=0.0)
+            return make_model(vocab_size, vocab_size, N=2, dropout=0.0)
 
     # Get model
     log.info('Building model...')
@@ -167,7 +167,7 @@ def main(args):
     model.train()
 
     criterion = nn.NLLLoss(ignore_index=0, reduction='sum')
-    model_opt = NoamOpt(model.module.src_emb[0].d_model, 1, 400,
+    model_opt = NoamOpt(model.module.src_embed[0].d_model, 1, 400,
                         torch.optim.Adam(model.parameters(), lr=0, betas=(0.9, 0.98), eps=1e-9))
 
     # Get saver
@@ -239,8 +239,8 @@ def main(args):
                 #copy_idxs_tgt = re_cw_idxs
                 #copy_idxs_tgt_y = re_cw_idxs
 
-                #c_mask = (cw_idxs != pad).unsqueeze(-2)
-                c_mask = re_cw_idxs == pad
+                c_mask = (re_cw_idxs != pad).unsqueeze(-2)
+                #c_mask = re_cw_idxs == pad
                 copy_idxs_tgt_mask = make_std_mask(copy_idxs_tgt, pad)
                 
                 # Forward
