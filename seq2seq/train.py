@@ -24,7 +24,7 @@ import os
 from args import get_train_args
 from collections import OrderedDict
 from json import dumps
-from models import Seq2Seq, Seq2SeqAttn, TransformerModel
+from models import Seq2SeqGru, Seq2Seq, Seq2SeqAttn, TransformerModel
 from tensorboardX import SummaryWriter
 from tqdm import tqdm
 from ujson import load as json_load
@@ -272,6 +272,97 @@ def main(args):
                     log.info('reached maximum number of epochs!')
                     exit(0)
 
+def gruMain(args):
+    # Set up logging and devices
+    args.save_dir = util.get_save_dir(args.save_dir, args.name, training=True)
+    log = util.get_logger(args.save_dir, args.name)
+    device, args.gpu_ids = util.get_available_devices()
+    log.info(f'Args: {dumps(vars(args), indent=4, sort_keys=True)}')
+    args.batch_size *= max(1, len(args.gpu_ids))
+
+    # Set random seed
+    log.info(f'Using random seed {args.seed}...')
+    random.seed(args.seed)
+    np.random.seed(args.seed)
+    torch.manual_seed(args.seed)
+    torch.cuda.manual_seed_all(args.seed)
+
+    # Get embeddings
+    log.info('Loading embeddings...')
+    word_vectors = util.torch_from_json(args.word_emb_file)
+
+    log.info('Loading word2Idx...')
+    word2Idx = json.loads(open(args.word2idx_file).read())
+    Idx2Word = {v: k for (k,v) in word2Idx.items()}
+    vocab_size = len(word2Idx)
+
+    def getWords(idxList):
+        words = []
+        for i in idxList:
+            words.append(Idx2Word[i])
+        return words
+
+    # Get model
+    log.info('Building model...')
+    model = Seq2SeqGru(Idx2Word=Idx2Word, hidden_size=args.hidden_size,
+                    output_size=vocab_size,
+                    device=device)
+    model = model.to(device)
+
+    # Get data loader
+    log.info('Building dataset...')
+    train_dataset = SQuAD(args.train_record_file, args.use_squad_v2)
+    train_loader = data.DataLoader(train_dataset,
+                                   batch_size=args.batch_size,
+                                   shuffle=True,
+                                   num_workers=args.num_workers,
+                                   collate_fn=collate_fn)
+    dev_dataset = SQuAD(args.dev_record_file, args.use_squad_v2)
+    dev_loader = data.DataLoader(dev_dataset,
+                                 batch_size=args.batch_size,
+                                 shuffle=False,
+                                 num_workers=args.num_workers,
+                                 collate_fn=collate_fn)
+
+    # Train
+    log.info('Training...')
+    epoch = 0
+    report_loss = 0
+    while epoch != args.num_epochs:
+        epoch += 1
+        log.info(f'Starting epoch {epoch}...')
+        with torch.enable_grad(), \
+                tqdm(total=len(train_loader.dataset)) as progress_bar:
+            for cw_idxs, re_cw_idxs, cc_idxs, qw_idxs, qc_idxs, y1, y2, ids in train_loader:
+                # Setup for forward
+                re_cw_idxs = re_cw_idxs.to(device)
+                qw_idxs = qw_idxs.to(device)
+                batch_size = re_cw_idxs.size(0)
+                
+                c_mask = torch.zeros_like(re_cw_idxs) != re_cw_idxs
+                q_mask = torch.zeros_like(qw_idxs) != qw_idxs
+
+                # Forward
+
+                batch_loss = model(re_cw_idxs, re_cw_idxs[:, 0:1])
+                loss = batch_loss / batch_size
+
+                # Evaluate on Train
+                if epoch == args.num_epochs-1:
+                    for i in range(batch_size):
+                        idx = re_cw_idxs[i]
+                        print("Expected : " + str(getWords([idx[0:1].squeeze().tolist()])))
+                        print(model.evaluate(idx.unsqueeze(0)))
+
+                # Log info
+                progress_bar.update(batch_size)
+                progress_bar.set_postfix(epoch=epoch,
+                                         NLL=loss)
+
+        if epoch == args.num_epochs:
+            log.info('reached maximum number of epochs!')
+
+
 def evaluate(model, data_loader, device, use_squad_v2):
     """ Evaluate on dev questions
     @param model (Module): Question Generation Model
@@ -325,4 +416,4 @@ def evaluate(model, data_loader, device, use_squad_v2):
     return results
 
 if __name__ == '__main__':
-    main(get_train_args())
+    gruMain(get_train_args())

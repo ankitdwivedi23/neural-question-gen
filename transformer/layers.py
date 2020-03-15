@@ -4,6 +4,7 @@ code adapted from:
     > https://github.com/chrischute/squad
 """
 
+import math
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -179,3 +180,45 @@ class Generator(nn.Module):
 
     def forward(self, x):
         return F.log_softmax(self.proj(x), dim=-1)
+
+
+class TransformerPreTrainedEmbedding(nn.Module):
+    def __init__(self, word_vectors, d_model):
+        super(TransformerPreTrainedEmbedding, self).__init__()
+        self.d_model = d_model
+        self.emb = nn.Embedding.from_pretrained(word_vectors, freeze=True, padding_idx=0)
+        self.proj = nn.Linear(word_vectors.size(1), d_model, bias=False)
+
+    def forward(self, x):
+        return self.proj(self.emb(x)) * math.sqrt(self.d_model)
+
+
+class TransformerEmbedding(nn.Module):
+    def __init__(self, d_model, vocab):
+        super(TransformerEmbedding, self).__init__()
+        self.lut = nn.Embedding(vocab, d_model, padding_idx=0)
+        self.d_model = d_model
+
+    def forward(self, x):
+        return self.lut(x) * math.sqrt(self.d_model)
+
+
+class PositionalEncoding(nn.Module):
+    "Implement the PE function."
+    def __init__(self, d_model, dropout, max_len=5000):
+        super(PositionalEncoding, self).__init__()
+        self.dropout = nn.Dropout(p=dropout)
+        
+        # Compute the positional encodings once in log space.
+        pe = torch.zeros(max_len, d_model)
+        position = torch.arange(0, max_len).unsqueeze(1)
+        div_term = torch.exp(torch.arange(0, d_model, 2) *
+                             -(math.log(10000.0) / d_model))
+        pe[:, 0::2] = torch.sin(position * div_term)
+        pe[:, 1::2] = torch.cos(position * div_term)
+        pe = pe.unsqueeze(0)
+        self.register_buffer('pe', pe)
+        
+    def forward(self, x):
+        x = x + self.pe[:, :x.size(1)]
+        return self.dropout(x)

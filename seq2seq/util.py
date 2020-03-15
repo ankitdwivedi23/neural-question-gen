@@ -558,7 +558,7 @@ def torch_from_json(path, dtype=torch.float32):
 def TeacherForce(model, word2idx_dict, idx2word_dict, cw_idx, qw_idx, device):
     SOS = "--SOS--"
     EOS = "--EOS--"
-    max_len = 10
+    max_len = 2
 
     q = qw_idx.squeeze().tolist()
 
