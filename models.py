@@ -263,8 +263,8 @@ class TransformerModel(nn.Module):
         c = copy.deepcopy
         position = layers.PositionalEncoding(d_model, dropout)
         self.device = device
-        self.src_embed = nn.Sequential(layers.TransformerEmbedding(vocab_size, d_model), c(position))
-        self.tgt_embed = nn.Sequential(layers.TransformerEmbedding(vocab_size, d_model), c(position))
+        self.src_embed = nn.Sequential(layers.TransformerEmbedding(d_model, vocab_size), c(position))
+        self.tgt_embed = nn.Sequential(layers.TransformerEmbedding(d_model, vocab_size), c(position))
         self.encoder_layer = nn.TransformerEncoderLayer(d_model, nhead, dim_feedforward, dropout)
         self.encoder = nn.TransformerEncoder(self.encoder_layer, num_encoder_layers)
         self.decoder_layer = nn.TransformerDecoderLayer(d_model, nhead, dim_feedforward, dropout)
