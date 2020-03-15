@@ -23,6 +23,9 @@ from typing import List, Tuple, Dict, Set, Union
 from torchtext.data.metrics import bleu_score
 from transformer import make_model, make_std_mask
 
+SOS = "--SOS--"
+EOS = "--EOS--"
+
 class SQuAD(data.Dataset):
     """Stanford Question Answering Dataset (SQuAD).
 
@@ -591,8 +594,6 @@ def TeacherForce(model, word2idx_dict, idx2word_dict, cw_idx, qw_idx, device):
     print(sent)
 
 def evaluateRandomly(model, word2idx_dict, idx2word_dict, cw_idx, device):
-    SOS = "--SOS--"
-    EOS = "--EOS--"
     max_len = 10
 
     with torch.no_grad():        
@@ -615,8 +616,6 @@ def evaluateRandomly(model, word2idx_dict, idx2word_dict, cw_idx, device):
     
 
 def evaluate(model, word2idx_dict, idx2word_dict, cw_idx, device):
-    SOS = "--SOS--"
-    EOS = "--EOS--"
     max_len = 30
 
     if model.module.model_type in ['seq2seq', 'seq2seq_attn']:
@@ -694,9 +693,7 @@ def beamSearch(model, word2idx_dict, idx2word_dict, cw_idx, device, beam_size: i
                 value: List[str]: the decoded target question, represented as a list of words
                 score: float: the log-likelihood of the target question
     """
-    SOS = "--SOS--"
-    EOS = "--EOS--"
-
+    
     if model.module.model_type in ['seq2seq', 'seq2seq_attn']:
          c_enc, dec_init_state = model.module.encode(cw_idx)     # (1, c_len, 2 * hidden_size)
     elif model.module.model_type == 'transformer':
@@ -774,7 +771,7 @@ def beamSearch(model, word2idx_dict, idx2word_dict, cw_idx, device, beam_size: i
 
 def greedy_decode(model, src, src_mask, max_len, start_symbol):
     with torch.no_grad():
-        memory = model.module.encode(src, src_mask)
+        memory = model.module.encode(src, src_mask)     
         ys = torch.ones(1, 1).fill_(start_symbol).type_as(src.data)
         for i in range(max_len-1):
             #prob = model.module.decode(memory, src_mask, ys, make_std_mask(ys, 0).type_as(src.data))
@@ -785,6 +782,7 @@ def greedy_decode(model, src, src_mask, max_len, start_symbol):
             ys = torch.cat([ys,
                             torch.ones(1, 1).type_as(src.data).fill_(next_word)], dim=1)
         return ys
+
 
 def convert_tokens(eval_dict, qa_id, y_start_list, y_end_list, no_answer):
     """Convert predictions to tokens from the context.
