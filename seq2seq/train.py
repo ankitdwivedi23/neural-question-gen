@@ -30,6 +30,10 @@ from tqdm import tqdm
 from ujson import load as json_load
 from util import collate_fn, SQuAD
 
+PAD = 0
+SOS = 2
+EOS = 3
+
 def percentile(t: torch.tensor, q: float) -> Union[int, float]:
     """
     Return the ``q``-th percentile of the flattened input tensor's data.
@@ -122,8 +126,8 @@ def main(args):
     optimizer = torch.optim.Adam(model.parameters(), lr=float(args.lr))
 
     num_trial = 0
-    train_iter = patience = cum_loss = report_loss = cum_tgt_words = report_tgt_words = 0
-    cum_examples = report_examples = epoch = valid_num = 0
+    train_iter = patience = total_loss = report_loss = total_words = report_words = 0
+    total_examples = report_examples = epoch = valid_num = 0
     train_time = begin_time = time.time()
 
     # Get data loader
@@ -149,58 +153,83 @@ def main(args):
         log.info(f'Starting epoch {epoch}...')
         with torch.enable_grad(), \
                 tqdm(total=len(train_loader.dataset)) as progress_bar:
-            for cw_idxs, re_cw_idxs, cc_idxs, qw_idxs, qc_idxs, y1, y2, ids in train_loader:
+            for cw_idxs, cc_idxs, qw_idxs, qc_idxs, y1, y2, ids in train_loader:
                 
                 train_iter += 1
 
-                # Setup for forward
-                re_cw_idxs = re_cw_idxs.to(device)
+                cw_idxs = cw_idxs.to(device)
                 qw_idxs = qw_idxs.to(device)
-                batch_size = re_cw_idxs.size(0)
+                batch_size = cw_idxs.size(0)
+
+                # Setup for forward
+                src_idxs = cw_idxs                
+                tgt_idxs = qw_idxs[:, :-1]
+                tgt_idxs_y = qw_idxs[:, 1:]
+
                 optimizer.zero_grad()
                 
-                c_mask = torch.zeros_like(re_cw_idxs) != re_cw_idxs
-                q_mask = torch.zeros_like(qw_idxs) != qw_idxs
+                src_mask = src_idxs != PAD
+                tgt_mask = tgt_idxs != PAD
 
                 # Forward
 
                 if args.model_type in ['seq2seq', 'seq2seq_attn']:
-                    log_p = model(re_cw_idxs, qw_idxs)                  #(batch_size, q_len, vocab_size)
+                    log_p = model(src_idxs, tgt_idxs)                   #(batch_size, q_len, vocab_size)
                 elif args.model_type == 'transformer':
-                    log_p = model(re_cw_idxs, qw_idxs, c_mask, q_mask)  #(batch_size, q_len, vocab_size)
+                    log_p = model(src_idxs, tgt_idxs, src_mask, tgt_mask)  #(batch_size, q_len, vocab_size)
                 
-                log_p = log_p.contiguous().view(log_p.size(0) * log_p.size(1), log_p.size(2))
-                qw_idxs_tgt = qw_idxs[:, 1:]     # omitting leading `SOS`
-                qw_idxs = qw_idxs.contiguous().view(qw_idxs.size(0) * qw_idxs.size(1))
-                qw_idxs_tgt = qw_idxs_tgt.contiguous().view(qw_idxs_tgt.size(0) * qw_idxs_tgt.size(1))
-                q_tgt_mask = torch.zeros_like(qw_idxs_tgt) != qw_idxs_tgt
-                q_len = q_tgt_mask.sum(-1)
-                batch_loss = F.nll_loss(log_p, qw_idxs_tgt, ignore_index=0, reduction='sum')
-                loss = batch_loss / batch_size
-                loss_val = loss.item()
+                print("Context:")
+                print(src_idxs[0])
+                print("Question:")
+                print(tgt_idxs[0])
+                print("Predicted:")
+                print(log_p[0].argmax(-1))
+
+
+                log_p = log_p.contiguous().view(-1, log_p.size(-1))
+
+                #qw_idxs_tgt = qw_idxs[:, 1:]     # omitting leading `SOS`
+                #qw_idxs = qw_idxs.contiguous().view(qw_idxs.size(0) * qw_idxs.size(1))
+                #qw_idxs_tgt = qw_idxs_tgt.contiguous().view(qw_idxs_tgt.size(0) * qw_idxs_tgt.size(1))
+                #q_tgt_mask = torch.zeros_like(qw_idxs_tgt) != qw_idxs_tgt
+                #q_len = q_tgt_mask.sum(-1)
+
+                # Backward
+                #loss.backward()
+                #nn.utils.clip_grad_norm_(model.parameters(), args.max_grad_norm)
+                #optimizer.step()
+
+                tgt_idxs_y = tgt_idxs_y.contiguous().view(-1)
+                tgt_no_pad = tgt_idxs_y != PAD
+                tgt_len = tgt_no_pad.sum(-1)
+
+                batch_words = torch.sum(tgt_len).item()
+                report_words += batch_words
+                total_words += batch_words
+                report_examples += batch_size
+                total_examples += batch_size
+
+
+                batch_loss = F.nll_loss(log_p, tgt_idxs_y, ignore_index=0, reduction='sum')
+                loss = batch_loss / batch_words
 
                 # Backward
                 loss.backward()
                 nn.utils.clip_grad_norm_(model.parameters(), args.max_grad_norm)
                 optimizer.step()
-                
+
                 batch_loss_val = batch_loss.item()
                 report_loss += batch_loss_val
-                cum_loss += batch_loss_val
-
-                tgt_words_num_to_predict = torch.sum(q_len).item()
-                report_tgt_words += tgt_words_num_to_predict
-                cum_tgt_words += tgt_words_num_to_predict
-                report_examples += batch_size
-                cum_examples += batch_size
+                total_loss += batch_loss_val
 
                 # Log info
                 step += batch_size
                 progress_bar.update(batch_size)
                 progress_bar.set_postfix(epoch=epoch,
-                                         NLL=loss_val)
+                                         NLL=batch_loss_val)
                 
                 if train_iter % args.log_every == 0:
+                    '''
                     log.info('epoch %d, iter %d, avg. loss %.2f, avg. ppl %.2f ' \
                       'cum. examples %d, speed %.2f words/sec, time elapsed %.2f sec' % (epoch, train_iter,
                                                                                          report_loss / report_examples,
@@ -208,14 +237,40 @@ def main(args):
                                                                                          cum_examples,
                                                                                          report_tgt_words / (time.time() - train_time),
                                                                                          time.time() - begin_time))
+                    '''
+
+                    '''
+                    print("Context Words:")
+                    print(getWords(src_idxs[0].squeeze().tolist()))
+
+                    #util.evaluateRandomly(model, word2Idx, Idx2Word, re_cw_idxs[batch_size-1].unsqueeze(0), device)
+                    
+                    print("Question Words:")
+                    print(getWords(tgt_idxs[0].squeeze().tolist()))
+
+                    print("Predicted Words:")
+                    model.eval()
+                    predicted_words = util.greedy_decode(model, src_idxs[0].unsqueeze(0), src_mask[0].unsqueeze(0), max_len=30, start_symbol=2)
+                    print(predicted_words)
+                    print(getWords(predicted_words.squeeze().tolist()))
+                    model.train()
+                    '''
+                    log.info('epoch %d, iter %d, avg. loss %.2f, avg. ppl %.2f ' \
+                      'cum. examples %d, speed %.2f words/sec, time elapsed %.2f sec' % (epoch, train_iter,
+                                                                                         report_loss / report_words,
+                                                                                         math.exp(report_loss / report_words),
+                                                                                         total_examples,
+                                                                                         report_words / (time.time() - train_time),
+                                                                                         time.time() - begin_time))
 
                     train_time = time.time()
-                    report_loss = report_tgt_words = report_examples = 0.
+                    report_loss = report_words = report_examples = 0.
 
                     #print(getWords(re_cw_idxs[batch_size-1].squeeze().tolist()))
                     #print(getWords(qw_idxs[batch_size-1].squeeze().tolist()))
                     #util.evaluateRandomly(model, word2Idx, Idx2Word, re_cw_idxs[batch_size-1].unsqueeze(0), device)
                 
+                '''
                 # perform validation
                 if train_iter % args.valid_niter == 0:
                     log.info('epoch %d, iter %d, cum. loss %.2f, cum. ppl %.2f cum. examples %d' % (epoch, train_iter,
@@ -271,6 +326,7 @@ def main(args):
                 if epoch == args.num_epochs:
                     log.info('reached maximum number of epochs!')
                     exit(0)
+                '''
 
 def gruMain(args):
     # Set up logging and devices
