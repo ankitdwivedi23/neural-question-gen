@@ -347,9 +347,12 @@ def gruMain(args):
                 batch_loss = model(re_cw_idxs, re_cw_idxs[:, 0:2])
                 loss = batch_loss / batch_size
 
-                idx = re_cw_idxs[batch_size-1]
-                print(getWords(idx.squeeze().tolist()))
-                print(model.evaluate(idx.unsqueeze(0)))
+                # Evaluate on Train
+                if epoch == args.num_epochs-1:
+                    for i in range(batch_size):
+                        idx = re_cw_idxs[i]
+                        print(getWords(idx.squeeze().tolist()))
+                        print(model.evaluate(idx.unsqueeze(0)))
 
                 # Log info
                 progress_bar.update(batch_size)
