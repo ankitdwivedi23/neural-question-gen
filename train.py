@@ -246,6 +246,13 @@ def main(args):
                 elif args.model_type == 'transformer':
                     log_p = model(src_idxs, tgt_idxs, src_mask, tgt_mask)           #(batch_size, q_len, vocab_size)
 
+                print("Context:")
+                print(src_idxs[0])
+                print("Question:")
+                print(tgt_idxs[0])
+                print("Predicted:")
+                print(log_p[0])
+
                 log_p = log_p.contiguous().view(-1, log_p.size(-1))
 
                 
@@ -306,10 +313,6 @@ def main(args):
                                                                                          report_tgt_words / (time.time() - train_time),
                                                                                          time.time() - begin_time))
                     '''
-
-                    '''
-                    CHECK OUTPUT
-
                     print("Context Words:")
                     print(getWords(src_idxs[0].squeeze().tolist()))
 
@@ -324,7 +327,7 @@ def main(args):
                     print(predicted_words)
                     print(getWords(predicted_words.squeeze().tolist()))
                     model.train()
-                    '''
+                    
 
 
                     log.info('epoch %d, iter %d, avg. loss %.2f, avg. ppl %.2f ' \
