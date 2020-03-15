@@ -196,7 +196,7 @@ class TransformerPreTrainedEmbedding(nn.Module):
 class TransformerEmbedding(nn.Module):
     def __init__(self, d_model, vocab):
         super(TransformerEmbedding, self).__init__()
-        self.lut = nn.Embedding(vocab, d_model)
+        self.lut = nn.Embedding(vocab, d_model, padding_idx=0)
         self.d_model = d_model
 
     def forward(self, x):
