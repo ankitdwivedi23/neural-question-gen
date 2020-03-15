@@ -22,6 +22,9 @@ from tqdm import tqdm
 from ujson import load as json_load
 from util import collate_fn, SQuAD
 
+PAD = 0
+SOS = 2
+EOS = 3
 
 def main(args):
 
@@ -60,7 +63,7 @@ def main(args):
                     output_size=vocab_size,
                     device=device)
         elif args.model_type == "transformer":
-            return TransformerModel(vocab_size, device)
+            return TransformerModel(vocab_size, device, num_encoder_layers=2, num_decoder_layers=2, dropout=0.0)
 
     # Get model
     log.info('Building model...')
@@ -95,13 +98,37 @@ def main(args):
     with torch.no_grad(), \
             tqdm(total=len(dataset)) as progress_bar:
         for cw_idxs, re_cw_idxs, cc_idxs, qw_idxs, qc_idxs, y1, y2, ids in data_loader:
-            # Setup for forward
             cw_idxs = cw_idxs.to(device)
+            re_cw_idxs = re_cw_idxs.to(device)
             qw_idxs = qw_idxs.to(device)
             batch_size = cw_idxs.size(0)
 
+            # Setup for forward
+            src_idxs = re_cw_idxs
+            src_idxs = torch.cat((torch.zeros((batch_size, 1), device=device, dtype=torch.long), src_idxs, torch.zeros((batch_size, 1), device=device, dtype=torch.long)), dim=-1)
+            src_idxs[:,0] = SOS
+            src_idxs[:,-1] = EOS        
+            tgt_idxs = qw_idxs[:, :-1]
+            tgt_idxs_y = qw_idxs[:, 1:]
+
             # Forward
-            for cw_idx, qw_idx in zip(torch.split(cw_idxs, split_size_or_sections=1, dim=0), torch.split(qw_idxs, split_size_or_sections=1, dim=0)):
+            for src_idx, tgt_idx in zip(torch.split(src_idxs, split_size_or_sections=1, dim=0), torch.split(tgt_idxs, split_size_or_sections=1, dim=0)):
+                src_mask = src_idx == PAD
+                print("Context Words:")
+                print(getWords(src_idx[0].tolist()))
+                #print(getWords(qw_idxs[batch_size-1].squeeze().tolist()))
+                #util.evaluateRandomly(model, word2Idx, Idx2Word, re_cw_idxs[batch_size-1].unsqueeze(0), device)
+                
+                print("Question Words:")
+                print(getWords(tgt_idx[0].tolist()))
+
+                print("Predicted Words:")
+                model.eval()
+                predicted_words = util.greedy_decode(model, src_idx, src_mask, max_len=30, start_symbol=2)
+                print(predicted_words)
+                print(getWords(predicted_words.squeeze().tolist()))
+
+                '''
                 #y = F.one_hot(qw_idx, num_classes=len(word_vectors))
                 #print(getWords(cw_idx.squeeze().tolist()))
                 #print(getWords(qw_idx.squeeze().tolist()))
@@ -120,6 +147,7 @@ def main(args):
 
                 cw_list.append(cw_idx)
                 qw_list.append(qw_idx)
+                '''
 
             # Log info
             progress_bar.update(batch_size)
@@ -127,7 +155,7 @@ def main(args):
                 # No labels for the test set, so NLL would be invalid
                 progress_bar.set_postfix(NLL=nll_meter.avg)
 
-    util.estimateBLEU(model, args.split, word2Idx, Idx2Word, cw_list, qw_list, device)
+    #util.estimateBLEU(model, args.split, word2Idx, Idx2Word, cw_list, qw_list, device)
         
 '''
 

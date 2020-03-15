@@ -347,6 +347,17 @@ def main(args):
                     report_loss = report_words = report_examples = 0.
                 
                 # perform validation
+                if train_iter % args.valid_niter == 0:
+                    print('begin validation ...', file=sys.stderr)
+                     # compute dev metrics
+                    results = evaluate(model, dev_loader, device, args.use_squad_v2)
+                    log.info('validation: iter %d, dev. ppl %f' % (train_iter, results[args.metric_name]))
+
+                    if saver.is_best(results[args.metric_name]):
+                        log.info('save currently the best model to [%s]' % model_save_path)
+                        saver.save(step, model, results[args.metric_name], device)
+
+
                 '''
                 if train_iter % args.valid_niter == 0:
                     log.info('epoch %d, iter %d, cum. loss %.2f, cum. ppl %.2f cum. examples %d' % (epoch, train_iter,
@@ -433,12 +444,18 @@ def evaluate(model, data_loader, device, use_squad_v2):
             batch_size = cw_idxs.size(0)
             
             # Setup for forward
-            src_idxs = re_cw_idxs           
+            src_idxs = re_cw_idxs
+            src_idxs = torch.cat((torch.zeros((batch_size, 1), device=device, dtype=torch.long), src_idxs, torch.zeros((batch_size, 1), device=device, dtype=torch.long)), dim=-1)
+            src_idxs[:,0] = SOS
+            src_idxs[:,-1] = EOS        
             tgt_idxs = qw_idxs[:, :-1]
-            tgt_idxs_y = qw_idxs[:, 1:] 
+            tgt_idxs_y = qw_idxs[:, 1:]
+
+            src_mask = src_idxs == PAD
+            tgt_mask = tgt_idxs == PAD
 
             # Forward
-            log_p = model(src_idxs, tgt_idxs)        #(batch_size, q_len, vocab_size)                
+            log_p = model(src_idxs, tgt_idxs, src_mask, tgt_mask)        #(batch_size, q_len, vocab_size)                
             log_p = log_p.contiguous().view(-1, log_p.size(-1))
 
             tgt_idxs_y = tgt_idxs_y.contiguous().view(-1)
@@ -451,8 +468,6 @@ def evaluate(model, data_loader, device, use_squad_v2):
             batch_loss = loss_compute(log_p, tgt_idxs_y, batch_words, model.training)
             
             nll_meter.update(batch_loss, batch_size)
-
-            
 
             # Calculate perplexity        
             total_loss += batch_loss            
