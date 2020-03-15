@@ -169,7 +169,6 @@ def main(args):
     criterion = nn.NLLLoss(ignore_index=0, reduction='sum')
     model_opt = NoamOpt(model.module.src_emb[0].d_model, 1, 400,
                         torch.optim.Adam(model.parameters(), lr=0, betas=(0.9, 0.98), eps=1e-9))
-    loss_compute = SimpleLossCompute(criterion, model_opt)
 
     # Get saver
     saver = util.CheckpointSaver(args.save_dir,
@@ -210,6 +209,7 @@ def main(args):
     epoch = step // len(train_dataset)
     while epoch != args.num_epochs:
         epoch += 1
+        loss_compute = SimpleLossCompute(criterion, model_opt)
         log.info(f'Starting epoch {epoch}...')
         with torch.enable_grad(), \
                 tqdm(total=len(train_loader.dataset)) as progress_bar:
