@@ -66,7 +66,7 @@ class Seq2SeqGru(nn.Module):
         batch_size = cw_idxs.size(0)
 
         loss = 0
-        
+        print(self.device)
         encoder_hidden = self.encoder.initHidden(batch_size), self.encoder.initHidden(batch_size)
         for ei in range(input_length):
             encoder_output, encoder_hidden = self.encoder(input_tensor[:, ei].unsqueeze(0), encoder_hidden)
@@ -115,7 +115,8 @@ class Seq2SeqGru(nn.Module):
                 encoder_hidden = encoder_hidden[0].unsqueeze(0), encoder_hidden
 
             decoder_input = torch.tensor([[self.SOS_token]*batch_size], device=self.device)
-        
+            print(self.device)
+            input("Jai Shri Ram")    
             decoder_hidden =  encoder_hidden
 
             decoded_words = []
