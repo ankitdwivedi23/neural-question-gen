@@ -263,12 +263,12 @@ class TransformerModel(nn.Module):
         c = copy.deepcopy
         position = layers.PositionalEncoding(d_model, dropout)
         self.device = device
-        self.src_emb = nn.Sequential(layers.TransformerEmbedding(d_model, vocab_size), c(position))
-        self.tgt_emb = nn.Sequential(layers.TransformerEmbedding(d_model, vocab_size), c(position))
+        self.src_embed = nn.Sequential(layers.TransformerEmbedding(d_model, vocab_size), c(position))
+        self.tgt_embed = nn.Sequential(layers.TransformerEmbedding(d_model, vocab_size), c(position))
         #self.emb = nn.Embedding(num_embeddings=vocab_size, embedding_dim=d_model, padding_idx=0)
         self.encoder_layer = nn.TransformerEncoderLayer(d_model, nhead, dim_feedforward, dropout)
         self.encoder = nn.TransformerEncoder(self.encoder_layer, num_encoder_layers)
-        self.decoder_layer = nn.TransformerDecoderLayer(d_model, nhead, dim_feedforward)
+        self.decoder_layer = nn.TransformerDecoderLayer(d_model, nhead, dim_feedforward, dropout)
         self.decoder = nn.TransformerDecoder(self.decoder_layer, num_decoder_layers)
         self.generator = layers.Generator(d_model, vocab_size)
         self.model_type = 'transformer'
@@ -290,7 +290,7 @@ class TransformerModel(nn.Module):
         return log_p    
 
     def encode(self, cw_idxs, c_mask):
-        c_emb = self.src_emb(cw_idxs)                   # (batch_size, c_len, d_model)
+        c_emb = self.src_embed(cw_idxs)                   # (batch_size, c_len, d_model)
         c_emb = c_emb.transpose(0,1)                # (c_len, batch_size, d_model)
 
         #c_mask = c_mask.to(dtype=torch.uint8)       # (batch_size, c_len)
@@ -299,7 +299,7 @@ class TransformerModel(nn.Module):
         return enc_out
     
     def decode(self, qw_idxs, enc_out, c_mask, q_mask):
-        q_emb = self.tgt_emb(qw_idxs)                   # (batch_size, q_len, d_model)
+        q_emb = self.tgt_embed(qw_idxs)                   # (batch_size, q_len, d_model)
         q_emb = q_emb.transpose(0,1)                # (q_len, batch_size, d_model)
 
         self_attn_mask = self.generate_square_subsequent_mask(qw_idxs.size(1)).to(device=self.device)    # (q_len, q_len)

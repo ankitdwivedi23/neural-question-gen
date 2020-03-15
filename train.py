@@ -150,8 +150,8 @@ def main(args):
                     output_size=vocab_size,
                     device=device)
         elif args.model_type == "transformer":
-            #return TransformerModel(vocab_size, device, num_encoder_layers=2, num_decoder_layers=2, dropout=0.0)
-            return make_model(vocab_size, vocab_size, N=2, dropout=0.0)
+            return TransformerModel(vocab_size, device, num_encoder_layers=2, num_decoder_layers=2, dropout=0.0)
+            #return make_model(vocab_size, vocab_size, N=2, dropout=0.0)
 
     # Get model
     log.info('Building model...')
@@ -239,9 +239,10 @@ def main(args):
                 #copy_idxs_tgt = re_cw_idxs
                 #copy_idxs_tgt_y = re_cw_idxs
 
-                c_mask = (re_cw_idxs != pad).unsqueeze(-2)
-                #c_mask = re_cw_idxs == pad
-                copy_idxs_tgt_mask = make_std_mask(copy_idxs_tgt, pad)
+                #c_mask = (re_cw_idxs != pad).unsqueeze(-2)
+                c_mask = re_cw_idxs == pad
+                #copy_idxs_tgt_mask = make_std_mask(copy_idxs_tgt, pad)
+                copy_idxs_tgt_mask = copy_idxs_tgt == pad
                 
                 # Forward
 
