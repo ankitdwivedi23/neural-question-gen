@@ -354,34 +354,19 @@ def gruMain(args):
 
         if epoch == args.num_epochs:
             log.info('reached maximum number of epochs!')
-
-    # Get data loader
-    log.info('Rebuilding dataset with batch size 1 for evaluate...')
-    train_dataset = SQuAD(args.train_record_file, args.use_squad_v2)
-    train_loader = data.DataLoader(train_dataset,
-                                   batch_size=1,
-                                   shuffle=True,
-                                   num_workers=args.num_workers,
-                                   collate_fn=collate_fn)
-    dev_dataset = SQuAD(args.dev_record_file, args.use_squad_v2)
-    dev_loader = data.DataLoader(dev_dataset,
-                                 batch_size=1,
-                                 shuffle=False,
-                                 num_workers=args.num_workers,
-                                 collate_fn=collate_fn)
     # Evaluate 
     log.info('Evaluate over dev')
-    with torch.no_grad():
-        for cw_idxs, re_cw_idxs, cc_idxs, qw_idxs, qc_idxs, y1, y2, ids in dev_loader:
-            print(getWords(re_cw_idxs.squeeze().tolist()))
-            print(model.evaluate(re_cw_idxs))
+    for cw_idxs, re_cw_idxs, cc_idxs, qw_idxs, qc_idxs, y1, y2, ids in dev_loader:
+        for idx in re_cw_idxs:
+            print(getWords(idx.squeeze().tolist()))
+            print(model.evaluate(idx.unsqueeze(0)))
     
     log.info('Evaluate over train')
-    with torch.no_grad():
-        for cw_idxs, re_cw_idxs, cc_idxs, qw_idxs, qc_idxs, y1, y2, ids in train_loader:
-            print(getWords(re_cw_idxs.squeeze().tolist()))
-            print(model.evaluate(re_cw_idxs))
-            
+    for cw_idxs, re_cw_idxs, cc_idxs, qw_idxs, qc_idxs, y1, y2, ids in train_loader:
+        for idx in re_cw_idxs:
+            print(getWords(idx.squeeze().tolist()))
+            print(model.evaluate(idx.unsqueeze(0)))
+
 
 def evaluate(model, data_loader, device, use_squad_v2):
     """ Evaluate on dev questions
