@@ -213,18 +213,17 @@ def main(args):
         log.info(f'Starting epoch {epoch}...')
         with torch.enable_grad(), \
                 tqdm(total=len(train_loader.dataset)) as progress_bar:
-            for cw_idxs, re_cw_idxs, cc_idxs, qw_idxs, qc_idxs, y1, y2, ids in train_loader:
+            for cw_idxs, cc_idxs, qw_idxs, qc_idxs, y1, y2, ids in train_loader:
                 
                 train_iter += 1
 
                 cw_idxs = cw_idxs.to(device)
-                re_cw_idxs = re_cw_idxs.to(device)
                 qw_idxs = qw_idxs.to(device)
 
                 batch_size = cw_idxs.size(0)               
 
                 # Setup for forward
-                src_idxs = re_cw_idxs
+                src_idxs = cw_idxs
                 src_idxs = torch.cat((torch.zeros((batch_size, 1), device=device, dtype=torch.long), src_idxs, torch.zeros((batch_size, 1), device=device, dtype=torch.long)), dim=-1)
                 src_idxs[:,0] = SOS
                 src_idxs[:,-1] = EOS
@@ -436,15 +435,14 @@ def evaluate(model, data_loader, device, use_squad_v2):
 
     # no_grad() signals backend to throw away all gradients
     with torch.no_grad():
-        for cw_idxs, re_cw_idxs, cc_idxs, qw_idxs, qc_idxs, y1, y2, ids in data_loader:
+        for cw_idxs, cc_idxs, qw_idxs, qc_idxs, y1, y2, ids in data_loader:
             
             cw_idxs = cw_idxs.to(device)
-            re_cw_idxs = re_cw_idxs.to(device)
             qw_idxs = qw_idxs.to(device)
             batch_size = cw_idxs.size(0)
             
             # Setup for forward
-            src_idxs = re_cw_idxs
+            src_idxs = cw_idxs
             src_idxs = torch.cat((torch.zeros((batch_size, 1), device=device, dtype=torch.long), src_idxs, torch.zeros((batch_size, 1), device=device, dtype=torch.long)), dim=-1)
             src_idxs[:,0] = SOS
             src_idxs[:,-1] = EOS        

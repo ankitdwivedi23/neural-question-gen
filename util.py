@@ -50,7 +50,7 @@ class SQuAD(data.Dataset):
 
         dataset = np.load(data_path)
         self.context_idxs = torch.from_numpy(dataset['context_idxs']).long()
-        self.reduced_context_idxs = torch.from_numpy(dataset['reduced_context_idxs'])
+        #self.reduced_context_idxs = torch.from_numpy(dataset['reduced_context_idxs'])
         self.context_char_idxs = torch.from_numpy(dataset['context_char_idxs']).long()
         self.question_idxs = torch.from_numpy(dataset['ques_idxs']).long()
         self.question_char_idxs = torch.from_numpy(dataset['ques_char_idxs']).long()
@@ -74,12 +74,11 @@ class SQuAD(data.Dataset):
         # SQuAD 1.1: Ignore no-answer examples
         self.ids = torch.from_numpy(dataset['ids']).long()
         self.valid_idxs = [idx for idx in range(len(self.ids))
-                           if use_v2 or self.y1s[idx].item() >= 0]
+                           if use_v2 or 'test' in data_path or self.y1s[idx].item() >= 0]
 
     def __getitem__(self, idx):
         idx = self.valid_idxs[idx]
         example = (self.context_idxs[idx],
-                   self.reduced_context_idxs[idx],
                    self.context_char_idxs[idx],
                    self.question_idxs[idx],
                    self.question_char_idxs[idx],
@@ -131,13 +130,13 @@ def collate_fn(examples):
         return padded
 
     # Group by tensor type
-    context_idxs, reduced_context_idxs, context_char_idxs, \
+    context_idxs, context_char_idxs, \
         question_idxs, question_char_idxs, \
         y1s, y2s, ids = zip(*examples)
 
     # Merge into batch tensors
     context_idxs = merge_1d(context_idxs)
-    reduced_context_idxs = merge_1d(reduced_context_idxs)
+    #reduced_context_idxs = merge_1d(reduced_context_idxs)
     context_char_idxs = merge_2d(context_char_idxs)
     question_idxs = merge_1d(question_idxs)
     question_char_idxs = merge_2d(question_char_idxs)
@@ -145,7 +144,7 @@ def collate_fn(examples):
     y2s = merge_0d(y2s)
     ids = merge_0d(ids)
 
-    return (context_idxs, reduced_context_idxs, context_char_idxs,
+    return (context_idxs, context_char_idxs,
             question_idxs, question_char_idxs,
             y1s, y2s, ids)
 
