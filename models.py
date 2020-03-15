@@ -258,18 +258,18 @@ class TransformerModel(nn.Module):
         dim_feedforward (int): Dimension of the feedforward network model
         dropout (float): Dropout probability
     """
-    def __init__(self, vocab_size, device, d_model=512, nhead=8, num_encoder_layers=6, num_decoder_layers=6, dim_feedforward=2048, dropout=0.1):
+    def __init__(self, word_vectors, device, d_model=512, nhead=8, num_encoder_layers=6, num_decoder_layers=6, dim_feedforward=2048, dropout=0.1):
         super(TransformerModel, self).__init__()
         c = copy.deepcopy
         position = layers.PositionalEncoding(d_model, dropout)
         self.device = device
-        self.src_embed = nn.Sequential(layers.TransformerEmbedding(d_model, vocab_size), c(position))
-        self.tgt_embed = nn.Sequential(layers.TransformerEmbedding(d_model, vocab_size), c(position))
+        self.src_embed = nn.Sequential(layers.TransformerPreTrainedEmbedding(word_vectors, d_model), c(position))
+        self.tgt_embed = nn.Sequential(layers.TransformerPreTrainedEmbedding(word_vectors, d_model), c(position))
         self.encoder_layer = nn.TransformerEncoderLayer(d_model, nhead, dim_feedforward, dropout)
         self.encoder = nn.TransformerEncoder(self.encoder_layer, num_encoder_layers)
         self.decoder_layer = nn.TransformerDecoderLayer(d_model, nhead, dim_feedforward, dropout)
         self.decoder = nn.TransformerDecoder(self.decoder_layer, num_decoder_layers)
-        self.generator = layers.Generator(d_model, vocab_size)
+        self.generator = layers.Generator(d_model, word_vectors.size(0))
         self.model_type = 'transformer'
 
         self._reset_parameters()

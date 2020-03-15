@@ -129,7 +129,7 @@ def main(args):
     Idx2Word = {v: k for (k,v) in word2Idx.items()}
     
     vocab_size = len(word2Idx)
-    print(f"Vocab Size is : {vocab_size}")
+    print(f"Vocab Size is : {word_vectors.size(0)}")
 
     def getWords(idxList):
         words = []
@@ -149,7 +149,7 @@ def main(args):
                     output_size=vocab_size,
                     device=device)
         elif args.model_type == "transformer":
-            return TransformerModel(vocab_size, device, num_encoder_layers=2, num_decoder_layers=2, dropout=0.0)
+            return TransformerModel(word_vectors, device, num_encoder_layers=2, num_decoder_layers=2, dropout=0.0)
             #return make_model(vocab_size, vocab_size, N=2, dropout=0.0)
 
     # Get model
