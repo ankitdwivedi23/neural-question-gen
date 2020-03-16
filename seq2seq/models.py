@@ -171,8 +171,6 @@ class Seq2Seq(nn.Module):
 
 
     def forward(self, cw_idxs, qw_idxs):
-        # Chop of the EOS token.
-        qw_idxs = qw_idxs[:, :-1]      
         _, dec_init_state = self.encode(cw_idxs)
         _, log_probs = self.decode(dec_init_state, qw_idxs)         #(batch_size, q_len, output_size)
         return log_probs
