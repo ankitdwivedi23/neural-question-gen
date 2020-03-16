@@ -186,7 +186,7 @@ class TransformerPreTrainedEmbedding(nn.Module):
     def __init__(self, word_vectors, d_model):
         super(TransformerPreTrainedEmbedding, self).__init__()
         self.d_model = d_model
-        self.emb = nn.Embedding.from_pretrained(word_vectors, freeze=True, padding_idx=0)
+        self.emb = nn.Embedding.from_pretrained(word_vectors, freeze=True)
         self.proj = nn.Linear(word_vectors.size(1), d_model, bias=False)
 
     def forward(self, x):

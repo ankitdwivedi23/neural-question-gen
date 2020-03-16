@@ -78,6 +78,7 @@ class SimpleLossCompute:
         #y = y.contiguous().view(-1)
 
         loss = self.criterion(x, y) / norm
+        loss = loss / 4
 
         if is_training:
             loss.backward()
@@ -132,7 +133,7 @@ def main(args):
     Idx2Word = {v: k for (k,v) in word2Idx.items()}
     
     vocab_size = len(word2Idx)
-    print(f"Vocab Size is : {vocab_size}")
+    print(f"Vocab Size is : {word_vectors.size(0)}")
 
     def getWords(idxList):
         words = []
@@ -153,7 +154,7 @@ def main(args):
                     device=device)
         elif args.model_type == "transformer":
             #return TransformerModel(vocab_size, device, num_encoder_layers=5, num_decoder_layers=5, dropout=0.1)
-            return make_model(vocab_size, vocab_size, N=2, dropout=0.0)
+            return make_model(word_vectors, vocab_size, N=2, dropout=0.0)
 
     # Get model
     log.info('Building model...')

@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import math, copy, time
+import layers
 
 def clones(module, N):
     "Produce N identical layers."
@@ -33,7 +34,7 @@ def attention(query, key, value, mask=None, dropout=None):
         p_attn = dropout(p_attn)
     return torch.matmul(p_attn, value), p_attn
 
-def make_model(src_vocab, tgt_vocab, N=6, 
+def make_model(word_vectors, tgt_vocab, N=6, 
                d_model=512, d_ff=2048, h=8, dropout=0.1):
     "Helper: Construct a model from hyperparameters."
     c = copy.deepcopy
@@ -44,8 +45,8 @@ def make_model(src_vocab, tgt_vocab, N=6,
         Encoder(EncoderLayer(d_model, c(attn), c(ff), dropout), N),
         Decoder(DecoderLayer(d_model, c(attn), c(attn), 
                              c(ff), dropout), N),
-        nn.Sequential(Embeddings(d_model, src_vocab), c(position)),
-        nn.Sequential(Embeddings(d_model, tgt_vocab), c(position)),
+        nn.Sequential(layers.TransformerPreTrainedEmbedding(word_vectors, d_model), c(position)),
+        nn.Sequential(layers.TransformerPreTrainedEmbedding(word_vectors, d_model), c(position)),
         Generator(d_model, tgt_vocab))
     
     # This was important from their code. 
