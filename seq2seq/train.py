@@ -251,7 +251,7 @@ def main(args):
                     print(predicted_idxs)
                     print(getWords(predicted_idxs))
                     model.train()
-                    '''
+                    
                     log.info('epoch %d, iter %d, avg. loss %.2f, avg. ppl %.2f ' \
                       'cum. examples %d, speed %.2f words/sec, time elapsed %.2f sec' % (epoch, train_iter,
                                                                                          report_loss / report_words,
@@ -266,8 +266,7 @@ def main(args):
                     #print(getWords(re_cw_idxs[batch_size-1].squeeze().tolist()))
                     #print(getWords(qw_idxs[batch_size-1].squeeze().tolist()))
                     #util.evaluateRandomly(model, word2Idx, Idx2Word, re_cw_idxs[batch_size-1].unsqueeze(0), device)
-                
-                '''
+                    
                 '''
                 # perform validation
                 if train_iter % args.valid_niter == 0:
