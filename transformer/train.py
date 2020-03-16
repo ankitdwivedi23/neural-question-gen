@@ -252,6 +252,11 @@ def main(args):
                 print(log_p[0].argmax(-1))
                 '''
 
+                print("Question:")
+                print(tgt_idxs[0])
+                print("Predicted:")
+                print(log_p[0].argmax(-1))
+
                 log_p = log_p.contiguous().view(-1, log_p.size(-1))
 
                 
