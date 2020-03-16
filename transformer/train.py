@@ -152,8 +152,8 @@ def main(args):
                     output_size=vocab_size,
                     device=device)
         elif args.model_type == "transformer":
-            return TransformerModel(vocab_size, device, num_encoder_layers=5, num_decoder_layers=5, dropout=0.1)
-            #return make_model(vocab_size, vocab_size, N=2, dropout=0.0)
+            #return TransformerModel(vocab_size, device, num_encoder_layers=5, num_decoder_layers=5, dropout=0.1)
+            return make_model(vocab_size, vocab_size, N=5, dropout=0.1)
 
     # Get model
     log.info('Building model...')
@@ -231,10 +231,10 @@ def main(args):
                 tgt_idxs = qw_idxs[:, :-1]
                 tgt_idxs_y = qw_idxs[:, 1:]
                 
-                #c_mask = (cw_idxs != pad).unsqueeze(-2)
-                src_mask = src_idxs == PAD
-                tgt_mask = tgt_idxs == PAD
-                #copy_idxs_tgt_mask = make_std_mask(copy_idxs_tgt, pad)
+                src_mask = (src_idxs != PAD).unsqueeze(-2)
+                tgt_mask = make_std_mask(tgt_idxs, PAD)
+                #src_mask = src_idxs == PAD
+                #tgt_mask = tgt_idxs == PAD
                 
                 # Forward
 
@@ -445,8 +445,11 @@ def evaluate(model, data_loader, device, use_squad_v2):
             tgt_idxs = qw_idxs[:, :-1]
             tgt_idxs_y = qw_idxs[:, 1:]
 
-            src_mask = src_idxs == PAD
-            tgt_mask = tgt_idxs == PAD
+            #src_mask = src_idxs == PAD
+            #tgt_mask = tgt_idxs == PAD
+
+            src_mask = (src_idxs != PAD).unsqueeze(-2)
+            tgt_mask = make_std_mask(tgt_idxs, PAD)
 
             # Forward
             log_p = model(src_idxs, tgt_idxs, src_mask, tgt_mask)        #(batch_size, q_len, vocab_size)                

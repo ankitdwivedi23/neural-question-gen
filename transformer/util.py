@@ -774,8 +774,8 @@ def greedy_decode(model, src, src_mask, max_len, start_symbol):
         memory = model.module.encode(src, src_mask)     
         ys = torch.ones(1, 1).fill_(start_symbol).type_as(src.data)
         for i in range(max_len-1):
-            #prob = model.module.decode(memory, src_mask, ys, make_std_mask(ys, 0).type_as(src.data))
-            prob = model.module.decode(ys, memory, src_mask, None)
+            prob = model.module.decode(memory, src_mask, ys, make_std_mask(ys, 0).type_as(src.data))
+            #prob = model.module.decode(ys, memory, src_mask, None)
             #prob = model.generator(out[:, -1])
             next_word = prob[0][-1].argmax(-1)
             next_word = next_word.item()
