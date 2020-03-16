@@ -150,7 +150,7 @@ def main(args):
                     device=device)
         elif args.model_type == "transformer":
             #return TransformerModel(vocab_size, device, num_encoder_layers=5, num_decoder_layers=5, dropout=0.1)
-            return make_model(word_vectors, vocab_size, N=2, dropout=0.0)
+            return make_model(word_vectors, vocab_size, N=1, dropout=0.0)
 
     # Get model
     log.info('Building model...')
@@ -180,7 +180,7 @@ def main(args):
                                     torch.optim.Adam(model.parameters(), lr=0, betas=(0.9, 0.98), eps=1e-9))
 
     criterion = nn.NLLLoss(ignore_index=PAD, reduction='sum')
-    #loss_compute = SimpleLossCompute(criterion, model_opt) 
+    loss_compute = SimpleLossCompute(criterion, model_opt) 
     
     # Default project starter code uses Adadelta, but we're going to use Adam
     # optimizer = torch.optim.Adam(model.parameters(), lr=float(args.lr))
@@ -208,7 +208,7 @@ def main(args):
     # Train
     log.info('Training...')
     epoch = step // len(train_dataset)
-    loss = torch.zeros(1, device=device)
+    #loss = torch.zeros(1, device=device)
 
     while epoch != args.num_epochs:
         epoch += 1
@@ -287,9 +287,9 @@ def main(args):
                 report_examples += batch_size
                 total_examples += batch_size
 
-                #batch_loss = loss_compute(log_p, tgt_idxs_y, batch_words, model.training)
-                loss += (criterion(log_p, tgt_idxs_y) / batch_words)
-                batch_loss = loss.item() * batch_words
+                batch_loss = loss_compute(log_p, tgt_idxs_y, batch_words, model.training)
+                #loss += (criterion(log_p, tgt_idxs_y) / batch_words)
+                #batch_loss = loss.item() * batch_words
 
                 '''
                 model_opt.optimizer.zero_grad()
@@ -308,12 +308,14 @@ def main(args):
                 progress_bar.set_postfix(epoch=epoch,
                                          NLL=batch_loss)
                 
+                '''
                 if (train_iter % 4 == 0 or batch_size < args.batch_size):
                     loss.backward()
                     model_opt.step()
                     model_opt.optimizer.zero_grad()
                     loss = torch.zeros(1, device=device)
-                
+                '''
+
                 if train_iter % args.log_every == 0:
                     '''
                     log.info('epoch %d, iter %d, avg. loss %.2f, avg. ppl %.2f ' \
