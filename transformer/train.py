@@ -312,13 +312,14 @@ def main(args):
                                                                                          report_tgt_words / (time.time() - train_time),
                                                                                          time.time() - begin_time))
                     '''
-                    '''
+                    
                     print("Context Words:")
                     print(getWords(src_idxs[0].squeeze().tolist()))
 
                     #util.evaluateRandomly(model, word2Idx, Idx2Word, re_cw_idxs[batch_size-1].unsqueeze(0), device)
                     
                     print("Question Words:")
+                    print(tgt_idxs[0])
                     print(getWords(tgt_idxs[0].squeeze().tolist()))
 
                     print("Predicted Words:")
@@ -327,7 +328,7 @@ def main(args):
                     print(predicted_words)
                     print(getWords(predicted_words.squeeze().tolist()))
                     model.train()
-                    '''
+                    
                     
 
 
