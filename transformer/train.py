@@ -61,7 +61,7 @@ class NoamOpt:
     def rate(self, step = None):
         "Implement `lrate` above"
         if step is None:
-            step = self._step
+            step = self._step / 4
         return self.factor * \
             (self.model_size ** (-0.5) *
             min(step ** (-0.5), step * self.warmup ** (-1.5)))
@@ -179,7 +179,7 @@ def main(args):
     model_save_path = os.path.join(args.save_dir, args.best_model_name)
 
     # Initialize optimizer and loss function
-    optimizer = NoamOpt(model.module.src_embed[0].d_model, 1, 2000,
+    optimizer = NoamOpt(model.module.src_embed[0].d_model, 1, 400,
                                     torch.optim.Adam(model.parameters(), lr=0, betas=(0.9, 0.98), eps=1e-9))
 
     criterion = nn.NLLLoss(ignore_index=PAD, reduction='sum')
