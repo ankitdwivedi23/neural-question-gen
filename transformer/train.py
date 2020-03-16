@@ -153,7 +153,7 @@ def main(args):
                     device=device)
         elif args.model_type == "transformer":
             #return TransformerModel(vocab_size, device, num_encoder_layers=5, num_decoder_layers=5, dropout=0.1)
-            return make_model(vocab_size, vocab_size, N=2, dropout=0.1)
+            return make_model(vocab_size, vocab_size, N=2, dropout=0.0)
 
     # Get model
     log.info('Building model...')
