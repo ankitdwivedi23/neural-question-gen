@@ -203,7 +203,7 @@ def main(args):
                                    collate_fn=collate_fn)
     dev_dataset = SQuAD(args.dev_record_file, args.use_squad_v2)
     dev_loader = data.DataLoader(dev_dataset,
-                                 batch_size=args.batch_size,
+                                 batch_size=64,
                                  shuffle=False,
                                  num_workers=args.num_workers,
                                  collate_fn=collate_fn)
