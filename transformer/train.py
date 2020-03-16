@@ -49,19 +49,19 @@ class NoamOpt:
     def step(self):
         "Update parameters and rate"
         self._step += 1
-        if self._step % 4 == 0:
-            rate = self.rate()
-            for p in self.optimizer.param_groups:
-                p['lr'] = rate
-            self._rate = rate
-            self.optimizer.step()
-            return True
-        return False
+        #if self._step % 4 == 0:
+        rate = self.rate()
+        for p in self.optimizer.param_groups:
+            p['lr'] = rate
+        self._rate = rate
+        self.optimizer.step()
+        #return True
+        #return False
         
     def rate(self, step = None):
         "Implement `lrate` above"
         if step is None:
-            step = self._step / 4
+            step = self._step
         return self.factor * \
             (self.model_size ** (-0.5) *
             min(step ** (-0.5), step * self.warmup ** (-1.5)))
@@ -82,8 +82,8 @@ class SimpleLossCompute:
         if is_training:
             loss.backward()
             if self.opt is not None:
-                if self.opt.step():
-                    self.opt.optimizer.zero_grad()            
+                self.opt.step()
+                self.opt.optimizer.zero_grad()            
         return loss.item() * norm
 
 
@@ -153,7 +153,7 @@ def main(args):
                     device=device)
         elif args.model_type == "transformer":
             #return TransformerModel(vocab_size, device, num_encoder_layers=5, num_decoder_layers=5, dropout=0.1)
-            return make_model(vocab_size, vocab_size, N=5, dropout=0.1)
+            return make_model(vocab_size, vocab_size, N=2, dropout=0.1)
 
     # Get model
     log.info('Building model...')
