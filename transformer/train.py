@@ -49,19 +49,16 @@ class NoamOpt:
     def step(self):
         "Update parameters and rate"
         self._step += 1
-        if self._step % 4 == 0:
-            rate = self.rate()
-            for p in self.optimizer.param_groups:
-                p['lr'] = rate
-            self._rate = rate
-            self.optimizer.step()
-            return True
-        return False
+        rate = self.rate()
+        for p in self.optimizer.param_groups:
+            p['lr'] = rate
+        self._rate = rate
+        self.optimizer.step()
         
     def rate(self, step = None):
         "Implement `lrate` above"
         if step is None:
-            step = self._step / 4
+            step = self._step
         return self.factor * \
             (self.model_size ** (-0.5) *
             min(step ** (-0.5), step * self.warmup ** (-1.5)))
@@ -78,13 +75,12 @@ class SimpleLossCompute:
         #y = y.contiguous().view(-1)
 
         loss = self.criterion(x, y) / norm
-        loss = loss / 4
 
         if is_training:
             loss.backward()
             if self.opt is not None:
-                if self.opt.step():
-                    self.opt.optimizer.zero_grad()            
+                self.opt.step()
+                self.opt.optimizer.zero_grad()            
         return loss.item() * norm
 
 
@@ -180,11 +176,11 @@ def main(args):
     model_save_path = os.path.join(args.save_dir, args.best_model_name)
 
     # Initialize optimizer and loss function
-    optimizer = NoamOpt(model.module.src_embed[0].d_model, 1, 400,
+    model_opt = NoamOpt(model.module.src_embed[0].d_model, 1, 400,
                                     torch.optim.Adam(model.parameters(), lr=0, betas=(0.9, 0.98), eps=1e-9))
 
     criterion = nn.NLLLoss(ignore_index=PAD, reduction='sum')
-    loss_compute = SimpleLossCompute(criterion, optimizer)    
+    #loss_compute = SimpleLossCompute(criterion, model_opt) 
     
     # Default project starter code uses Adadelta, but we're going to use Adam
     # optimizer = torch.optim.Adam(model.parameters(), lr=float(args.lr))
@@ -212,6 +208,8 @@ def main(args):
     # Train
     log.info('Training...')
     epoch = step // len(train_dataset)
+    loss = torch.zeros(1, device=device)
+
     while epoch != args.num_epochs:
         epoch += 1
         log.info(f'Starting epoch {epoch}...')
@@ -289,8 +287,10 @@ def main(args):
                 report_examples += batch_size
                 total_examples += batch_size
 
-                batch_loss = loss_compute(log_p, tgt_idxs_y, batch_words, model.training)
-                
+                #batch_loss = loss_compute(log_p, tgt_idxs_y, batch_words, model.training)
+                loss += (criterion(log_p, tgt_idxs_y) / batch_words)
+                batch_loss = loss.item() * batch_words
+
                 '''
                 model_opt.optimizer.zero_grad()
                 loss = criterion(log_p, copy_idxs_tgt_y) / batch_words
@@ -307,6 +307,12 @@ def main(args):
                 progress_bar.update(batch_size)
                 progress_bar.set_postfix(epoch=epoch,
                                          NLL=batch_loss)
+                
+                if (train_iter % 4 == 0 or batch_size < args.batch_size):
+                    loss.backward()
+                    model_opt.step()
+                    model_opt.optimizer.zero_grad()
+                    loss = torch.zeros(1, device=device)
                 
                 if train_iter % args.log_every == 0:
                     '''
