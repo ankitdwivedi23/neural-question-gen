@@ -143,11 +143,11 @@ class Seq2Seq(nn.Module):
     Args:
         word_vectors (torch.Tensor): Pre-trained word vectors.
         hidden_size (int): Number of features in the hidden state at each layer.
-        vocab_size(int): Number of logits for softmax layer
+        output_size(int): Number of logits for softmax layer
         device (string): 'cuda:0' or 'cpu'
         drop_prob (float): Dropout probability.
     """
-    def __init__(self, word_vectors, hidden_size, vocab_size, device, drop_prob=0., num_layers=1):
+    def __init__(self, word_vectors, hidden_size, output_size, device, drop_prob=0., num_layers=1):
         super(Seq2Seq, self).__init__()
 
         self.hidden_size = hidden_size
