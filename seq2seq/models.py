@@ -143,20 +143,20 @@ class Seq2Seq(nn.Module):
     Args:
         word_vectors (torch.Tensor): Pre-trained word vectors.
         hidden_size (int): Number of features in the hidden state at each layer.
-        output_size(int): Number of logits for softmax layer (vocab size)
+        vocab_size(int): Number of logits for softmax layer
         device (string): 'cuda:0' or 'cpu'
         drop_prob (float): Dropout probability.
     """
-    def __init__(self, word_vectors, hidden_size, output_size, device, drop_prob=0., num_layers=2):
+    def __init__(self, word_vectors, hidden_size, vocab_size, device, drop_prob=0., num_layers=1):
         super(Seq2Seq, self).__init__()
 
         self.hidden_size = hidden_size
-        self.output_size = output_size
         self.device = device
         self.word_vectors = word_vectors
         self.model_type = 'seq2seq'
 
-        self.emb = nn.Embedding(num_embeddings=output_size, embedding_dim=hidden_size, padding_idx=0)
+        #self.emb = nn.Embedding(num_embeddings=output_size, embedding_dim=hidden_size, padding_idx=0)
+        self.emb = layers.Embedding(word_vectors, hidden_size)
         
         self.encoder = layers.EncoderRNN(input_size=hidden_size,
                                      hidden_size=hidden_size,
@@ -165,9 +165,10 @@ class Seq2Seq(nn.Module):
 
         self.decoder = layers.DecoderRNN(input_size=hidden_size,
                                         hidden_size=hidden_size,
-                                        num_layers=num_layers)      
+                                        num_layers=num_layers,
+                                        drop_prob=drop_prob)      
 
-        self.generator = layers.Generator(hidden_size, output_size)
+        self.generator = layers.Generator(hidden_size, vocab_size)
 
 
     def forward(self, cw_idxs, qw_idxs):

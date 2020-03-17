@@ -76,7 +76,10 @@ def main(args):
     log.info('Loading word2Idx...')
     word2Idx = json.loads(open(args.word2idx_file).read())
     Idx2Word = {v: k for (k,v) in word2Idx.items()}
-    vocab_size = len(word2Idx)
+    
+    #vocab_size = len(word2Idx)
+    vocab_size = word_vectors.size(0)
+    print(f"Vocab size: {vocab_size}")
 
     def getWords(idxList):
         words = []
@@ -89,7 +92,9 @@ def main(args):
             return Seq2Seq(word_vectors=word_vectors,
                     hidden_size=args.hidden_size,
                     output_size=vocab_size,
-                    device=device)
+                    device=device,
+                    drop_prob=0,
+                    num_layers=1)
         elif args.model_type == "seq2seq_attn":
             return Seq2SeqAttn(word_vectors=word_vectors,
                     hidden_size=args.hidden_size,
@@ -178,8 +183,11 @@ def main(args):
                 elif args.model_type == 'transformer':
                     log_p = model(src_idxs, tgt_idxs, src_mask, tgt_mask)  #(batch_size, q_len, vocab_size)
                 
+                '''
                 print("Context:")
                 print(src_idxs[0])
+                '''
+
                 print("Question:")
                 print(tgt_idxs[0])
                 print("Predicted:")
