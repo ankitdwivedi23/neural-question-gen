@@ -168,7 +168,7 @@ class Seq2Seq(nn.Module):
                                         num_layers=num_layers,
                                         drop_prob=drop_prob)      
 
-        self.generator = layers.Generator(hidden_size, vocab_size)
+        self.generator = layers.Generator(hidden_size, output_size)
 
 
     def forward(self, cw_idxs, qw_idxs):
