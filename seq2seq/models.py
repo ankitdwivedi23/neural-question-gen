@@ -235,14 +235,14 @@ class Seq2SeqAttn(nn.Module):
         super(Seq2SeqAttn, self).__init__()
 
         self.hidden_size = hidden_size
-        self.output_size = output_size
         self.word_vectors = word_vectors
         self.device = device
         self.enc_hiddens = None
         self.enc_masks = None
         self.model_type = 'seq2seq_attn'
         
-        self.emb = nn.Embedding(num_embeddings=output_size, embedding_dim=hidden_size, padding_idx=0)
+        #self.emb = nn.Embedding(num_embeddings=output_size, embedding_dim=hidden_size, padding_idx=0)
+        self.emb = layers.Embedding(word_vectors, hidden_size)
 
         self.encoder = layers.EncoderRNN(input_size=hidden_size,
                                      hidden_size=hidden_size,
@@ -251,7 +251,8 @@ class Seq2SeqAttn(nn.Module):
 
         self.decoder = layers.DecoderRNN(input_size=2*hidden_size,
                                         hidden_size=hidden_size,
-                                        num_layers=num_layers)
+                                        num_layers=num_layers,
+                                        drop_prob=drop_prob)
 
         self.att_projection = nn.Linear(in_features=2*hidden_size, out_features=hidden_size, bias=False)
         self.combined_output_projection = nn.Linear(in_features=3*hidden_size, out_features=hidden_size, bias=False)
