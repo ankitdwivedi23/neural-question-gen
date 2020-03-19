@@ -308,11 +308,11 @@ class Seq2SeqAttn(nn.Module):
                 Ybar_t,
                 dec_state,
                 enc_hiddens_proj)
-            combined_decoder_outputs.append(o_t)
+            combined_decoder_outputs.append(o_t.squeeze(dim=1))
             o_prev = o_t
-    
+
         combined_decoder_outputs = torch.stack(combined_decoder_outputs, dim=1)       #(batch_size, q_len, hidden_size)
-        log_probs = self.generator(combined_decoder_outputs)                                    #(batch_size, q_len, output_size)
+        log_probs = self.generator(combined_decoder_outputs)                          #(batch_size, q_len, output_size)
         return dec_state, log_probs
 
     
@@ -344,11 +344,10 @@ class Seq2SeqAttn(nn.Module):
             e_t.data.masked_fill_(self.enc_masks == 0, -float('inf'))
 
         alpha_t = F.softmax(e_t, dim=-1)                                                            # alpha_t => (batch_size, c_len)
-        a_t = torch.bmm(torch.unsqueeze(alpha_t, dim=1), self.enc_hiddens).squeeze(dim=1)           # a_t => (batch_size, 2*hidden_size)
-        o_t = o_t.squeeze(1)                                                                        # o_t => (batch_size, hidden_size)
-        U_t = torch.cat((o_t, a_t), dim=-1)                                                         # U_t => (batch_size, 3*hidden_size)
-        V_t = self.combined_output_projection(U_t)                                                  # V_t => (batch_size, hidden_size) 
-        O_t = self.dropout(torch.tanh(V_t))                                                         # O_t => (batch_size, hidden_size) 
+        a_t = torch.bmm(torch.unsqueeze(alpha_t, dim=1), self.enc_hiddens)                          # a_t => (batch_size, 1, 2*hidden_size)
+        U_t = torch.cat((o_t, a_t), dim=-1)                                                         # U_t => (batch_size, 1, 3*hidden_size)
+        V_t = self.combined_output_projection(U_t)                                                  # V_t => (batch_size, 1, hidden_size) 
+        O_t = self.dropout(torch.tanh(V_t))                                                         # O_t => (batch_size, 1, hidden_size) 
 
         combined_output = O_t
         return dec_state, combined_output, e_t
