@@ -309,6 +309,7 @@ class Seq2SeqAttn(nn.Module):
                 dec_state,
                 enc_hiddens_proj)
             combined_decoder_outputs.append(o_t)
+            o_prev = o_t
     
         combined_decoder_outputs = torch.stack(combined_decoder_outputs, dim=1)       #(batch_size, q_len, hidden_size)
         log_probs = self.generator(combined_decoder_outputs)                                    #(batch_size, q_len, output_size)
