@@ -241,8 +241,8 @@ class Seq2SeqAttn(nn.Module):
         self.enc_masks = None
         self.model_type = 'seq2seq_attn'
         
-        #self.emb = nn.Embedding(num_embeddings=output_size, embedding_dim=hidden_size, padding_idx=0)
-        self.emb = layers.Embedding(word_vectors, hidden_size)
+        self.emb = nn.Embedding(num_embeddings=output_size, embedding_dim=hidden_size)
+        #self.emb = layers.Embedding(word_vectors, hidden_size)
 
         self.encoder = layers.EncoderRNN(input_size=hidden_size,
                                      hidden_size=hidden_size,
