@@ -90,7 +90,7 @@ class EncoderRNN(nn.Module):
         self.hidden_size = hidden_size
         self.rnn = nn.LSTM(input_size, hidden_size, num_layers,
                            batch_first=True,
-                           bidirectional=True,
+                           bidirectional=False,
                            dropout=drop_prob if num_layers > 1 else 0.)
         
         self.h_projection = nn.Linear(in_features=2*hidden_size, out_features=hidden_size, bias=False)
@@ -121,15 +121,16 @@ class EncoderRNN(nn.Module):
         #enc_hiddens = F.dropout(x, self.drop_prob, self.training)
 
         #Concatenate last hidden state of last encoder layer
-        last_hidden = last_hidden.contiguous().view(self.rnn.num_layers, 2, batch_size, self.rnn.hidden_size)  # (num_layers, num_directions=2, batch_size, hidden_size)
-        last_hidden = torch.cat((last_hidden[:,0:1,:,:], last_hidden[:,1:2,:,:]), dim=-1).squeeze(1)  # (num_layers, batch_size, 2 * hidden_size)
-        last_cell = last_cell.contiguous().view(self.rnn.num_layers, 2, batch_size, self.rnn.hidden_size)  # (num_layers, num_directions=2, batch_size, hidden_size)
-        last_cell = torch.cat((last_cell[:,0:1,:,:], last_cell[:,1:2,:,:]), dim=-1).squeeze(1) # (num_layers, batch_size, 2 * hidden_size)
+        #last_hidden = last_hidden.contiguous().view(self.rnn.num_layers, 2, batch_size, self.rnn.hidden_size)  # (num_layers, num_directions=2, batch_size, hidden_size)
+        #last_hidden = torch.cat((last_hidden[:,0:1,:,:], last_hidden[:,1:2,:,:]), dim=-1).squeeze(1)  # (num_layers, batch_size, 2 * hidden_size)
+        #last_cell = last_cell.contiguous().view(self.rnn.num_layers, 2, batch_size, self.rnn.hidden_size)  # (num_layers, num_directions=2, batch_size, hidden_size)
+        #last_cell = torch.cat((last_cell[:,0:1,:,:], last_cell[:,1:2,:,:]), dim=-1).squeeze(1) # (num_layers, batch_size, 2 * hidden_size)
 
         #Project last hidden and cell state to get initial decoder hidden and cell state
-        dec_init_hidden = self.h_projection(last_hidden)
-        dec_init_cell = self.c_projection(last_cell)
-        dec_init_state = (dec_init_hidden, dec_init_cell)
+        #dec_init_hidden = self.h_projection(last_hidden)
+        #dec_init_cell = self.c_projection(last_cell)
+        #dec_init_state = (dec_init_hidden, dec_init_cell)
+        dec_init_state = (last_hidden, last_cell)
 
         return x, dec_init_state
 
