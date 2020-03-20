@@ -178,7 +178,7 @@ class Seq2Seq(nn.Module):
 
 
     def encode(self, cw_idxs):
-        c_mask = torch.zeros_like(cw_idxs) != cw_idxs
+        c_mask = torch.zeros_like(cw_idxs, device=self.device) != cw_idxs
         c_len = c_mask.sum(-1)
 
         c_emb = self.emb(cw_idxs)         # (batch_size, c_len, hidden_size)
