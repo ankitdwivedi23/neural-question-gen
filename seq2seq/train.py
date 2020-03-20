@@ -93,8 +93,8 @@ def main(args):
                     hidden_size=args.hidden_size,
                     output_size=vocab_size,
                     device=device,
-                    drop_prob=0.2,
-                    num_layers=2)
+                    drop_prob=0.0,
+                    num_layers=1)
         elif args.model_type == "seq2seq_attn":
             return Seq2SeqAttn(word_vectors=word_vectors,
                     hidden_size=args.hidden_size,
