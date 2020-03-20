@@ -102,9 +102,9 @@ class EncoderRNN(nn.Module):
         batch_size = x.size(0)
 
         # Sort by length and pack sequence for RNN
-        #lengths, sort_idx = lengths.sort(0, descending=True)
-        #x = x[sort_idx]     # (batch_size, seq_len, input_size)
-        #x = pack_padded_sequence(x, lengths, batch_first=True)
+        lengths, sort_idx = lengths.sort(0, descending=True)
+        x = x[sort_idx]     # (batch_size, seq_len, input_size)
+        x = pack_padded_sequence(x, lengths, batch_first=True)
 
         # Flatten RNN params
         self.rnn.flatten_parameters()
@@ -113,9 +113,9 @@ class EncoderRNN(nn.Module):
         x, (last_hidden, last_cell) = self.rnn(x)  # (batch_size, seq_len, 2 * hidden_size)
 
         # Unpack and reverse sort
-        #x, _ = pad_packed_sequence(x, batch_first=True, total_length=orig_len)
-        #_, unsort_idx = sort_idx.sort(0)
-        #x = x[unsort_idx]   # (batch_size, seq_len, 2 * hidden_size)
+        x, _ = pad_packed_sequence(x, batch_first=True, total_length=orig_len)
+        _, unsort_idx = sort_idx.sort(0)
+        x = x[unsort_idx]   # (batch_size, seq_len, 2 * hidden_size)
 
         # Apply dropout (RNN applies dropout after all but the last layer)
         #enc_hiddens = F.dropout(x, self.drop_prob, self.training)
