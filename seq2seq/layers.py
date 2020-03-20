@@ -105,6 +105,8 @@ class EncoderRNN(nn.Module):
         lengths, sort_idx = lengths.sort(0, descending=True)
         x = x[sort_idx]     # (batch_size, seq_len, input_size)
         x = pack_padded_sequence(x, lengths, batch_first=True)
+        print("Packed Sequence")
+        print(x)
 
         # Flatten RNN params
         #self.rnn.flatten_parameters()
