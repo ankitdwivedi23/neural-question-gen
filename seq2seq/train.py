@@ -56,7 +56,7 @@ def percentile(t: torch.tensor, q: float) -> Union[int, float]:
 
 def main(args):    
     torch.set_default_dtype(torch.float64)
-    
+
     # Set up logging and devices
     args.save_dir = util.get_save_dir(args.save_dir, args.name, training=True)
     log = util.get_logger(args.save_dir, args.name)
@@ -169,7 +169,7 @@ def main(args):
                 batch_size = cw_idxs.size(0)
 
                 # Setup for forward
-                src_idxs = cw_idxs[:, :4]
+                src_idxs = cw_idxs[:, :1]
                 #src_idxs = cw_idxs
                 copy_idxs = torch.cat((torch.zeros((batch_size, 1), device=device, dtype=torch.long), src_idxs, torch.zeros((batch_size, 1), device=device, dtype=torch.long)), dim=-1)
                 copy_idxs[:,0] = SOS
