@@ -77,8 +77,8 @@ def main(args):
     word2Idx = json.loads(open(args.word2idx_file).read())
     Idx2Word = {v: k for (k,v) in word2Idx.items()}
     
-    #vocab_size = len(word2Idx)
-    vocab_size = word_vectors.size(0)
+    vocab_size = len(word2Idx)
+    #vocab_size = word_vectors.size(0)
     print(f"Vocab size: {vocab_size}")
 
     def getWords(idxList):
@@ -93,7 +93,7 @@ def main(args):
                     hidden_size=args.hidden_size,
                     output_size=vocab_size,
                     device=device,
-                    drop_prob=0.1,
+                    drop_prob=0.0,
                     num_layers=1)
         elif args.model_type == "seq2seq_attn":
             return Seq2SeqAttn(word_vectors=word_vectors,

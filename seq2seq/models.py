@@ -155,8 +155,8 @@ class Seq2Seq(nn.Module):
         self.word_vectors = word_vectors
         self.model_type = 'seq2seq'
 
-        #self.emb = nn.Embedding(num_embeddings=output_size, embedding_dim=hidden_size, padding_idx=0)
-        self.emb = layers.Embedding(word_vectors, hidden_size, drop_prob=drop_prob)
+        self.emb = nn.Embedding(num_embeddings=output_size, embedding_dim=hidden_size)
+        #self.emb = layers.Embedding(word_vectors, hidden_size, drop_prob=drop_prob)
         
         self.encoder = layers.EncoderRNN(input_size=hidden_size,
                                      hidden_size=hidden_size,
