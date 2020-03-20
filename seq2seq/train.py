@@ -167,9 +167,12 @@ def main(args):
                 batch_size = cw_idxs.size(0)
 
                 # Setup for forward
-                src_idxs = cw_idxs                
-                tgt_idxs = qw_idxs[:, :-1]
-                tgt_idxs_y = qw_idxs[:, 1:]
+                src_idxs = cw_idxs[:, :7]
+                copy_idxs = torch.cat((torch.zeros((batch_size, 1), device=device, dtype=torch.long), src_idxs, torch.zeros((batch_size, 1), device=device, dtype=torch.long)), dim=-1)
+                copy_idxs[:,0] = SOS
+                copy_idxs[:,-1] = EOS
+                tgt_idxs = copy_idxs[:, :-1]
+                tgt_idxs_y = copy_idxs[:, 1:]
 
                 optimizer.zero_grad()
                 
@@ -183,17 +186,18 @@ def main(args):
                 elif args.model_type == 'transformer':
                     log_p = model(src_idxs, tgt_idxs, src_mask, tgt_mask)  #(batch_size, q_len, vocab_size)
                 
-                '''
+                
                 print("Context:")
                 print(src_idxs[0])
-                '''
-
+                print(getWords(src_idxs[0].squeeze().tolist()))
                 print("Question:")
                 print(tgt_idxs[0])
+                print(getWords(tgt_idxs[0].squeeze().tolist()))
                 print("Predicted:")
                 print(log_p[0].argmax(-1))
-
-
+                print(getWords(log_p[0].argmax(-1).squeeze().tolist()))
+                
+                
                 log_p = log_p.contiguous().view(-1, log_p.size(-1))
 
                 #qw_idxs_tgt = qw_idxs[:, 1:]     # omitting leading `SOS`
@@ -246,6 +250,7 @@ def main(args):
                                                                                          report_tgt_words / (time.time() - train_time),
                                                                                          time.time() - begin_time))
                     '''
+                    '''
 
                     print("Context Words:")
                     print(getWords(src_idxs[0].squeeze().tolist()))                    
@@ -259,6 +264,7 @@ def main(args):
                     print(predicted_idxs)
                     print(getWords(predicted_idxs))
                     model.train()
+                    '''
                     
                     log.info('epoch %d, iter %d, avg. loss %.2f, avg. ppl %.2f ' \
                       'cum. examples %d, speed %.2f words/sec, time elapsed %.2f sec' % (epoch, train_iter,

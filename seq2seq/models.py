@@ -340,16 +340,18 @@ class Seq2SeqAttn(nn.Module):
         e_t = torch.bmm(o_t, torch.transpose(enc_hiddens_proj, dim0=1, dim1=2)).squeeze(dim=1)      # e_t => (batch_size, c_len)
 
         # Set e_t to -inf where enc_masks has 0
-        if self.enc_masks is not None:
-            e_t.data.masked_fill_(self.enc_masks == 0, -float('inf'))
+        #if self.enc_masks is not None:
+        #    e_t.data.masked_fill_(self.enc_masks == 0, -float('inf'))
 
-        alpha_t = F.softmax(e_t, dim=-1)                                                            # alpha_t => (batch_size, c_len)
-        a_t = torch.bmm(torch.unsqueeze(alpha_t, dim=1), self.enc_hiddens)                          # a_t => (batch_size, 1, 2*hidden_size)
-        U_t = torch.cat((o_t, a_t), dim=-1)                                                         # U_t => (batch_size, 1, 3*hidden_size)
-        V_t = self.combined_output_projection(U_t)                                                  # V_t => (batch_size, 1, hidden_size) 
-        O_t = self.dropout(torch.tanh(V_t))                                                         # O_t => (batch_size, 1, hidden_size) 
+        #alpha_t = F.softmax(e_t, dim=-1)                                                            # alpha_t => (batch_size, c_len)
+        #print(f"After softmax: {alpha_t.shape}")
+        #print(torch.max(alpha_t, dim=1)[0])
+        #a_t = torch.bmm(torch.unsqueeze(alpha_t, dim=1), self.enc_hiddens)                          # a_t => (batch_size, 1, 2*hidden_size)
+        #U_t = torch.cat((o_t, a_t), dim=-1)                                                         # U_t => (batch_size, 1, 3*hidden_size)
+        #V_t = self.combined_output_projection(U_t)                                                  # V_t => (batch_size, 1, hidden_size) 
+        #O_t = self.dropout(torch.tanh(V_t))                                                         # O_t => (batch_size, 1, hidden_size) 
 
-        combined_output = O_t
+        combined_output = o_t
         return dec_state, combined_output, e_t
 
 ##################################################################################################################
