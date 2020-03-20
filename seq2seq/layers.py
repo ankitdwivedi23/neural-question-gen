@@ -102,6 +102,8 @@ class EncoderRNN(nn.Module):
         batch_size = x.size(0)
 
         # Sort by length and pack sequence for RNN
+        print("Before sorting:")
+        print(x)
         lengths, sort_idx = lengths.sort(0, descending=True)
         x = x[sort_idx]     # (batch_size, seq_len, input_size)
         print("Sorted:")
