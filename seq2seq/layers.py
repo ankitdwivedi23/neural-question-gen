@@ -28,13 +28,13 @@ class Embedding(nn.Module):
         self.drop_prob = drop_prob
         self.embed = nn.Embedding.from_pretrained(word_vectors)
         self.proj = nn.Linear(word_vectors.size(1), hidden_size, bias=False)
-        #self.hwy = HighwayEncoder(2, hidden_size)
+        self.hwy = HighwayEncoder(2, hidden_size)
 
     def forward(self, x):
         emb = self.embed(x)   # (batch_size, seq_len, embed_size)
         emb = F.dropout(emb, self.drop_prob, self.training)
         emb = self.proj(emb)  # (batch_size, seq_len, hidden_size)
-        #emb = self.hwy(emb)   # (batch_size, seq_len, hidden_size)
+        emb = self.hwy(emb)   # (batch_size, seq_len, hidden_size)
 
         return emb
 
@@ -90,7 +90,7 @@ class EncoderRNN(nn.Module):
         self.hidden_size = hidden_size
         self.rnn = nn.LSTM(input_size, hidden_size, num_layers,
                            batch_first=True,
-                           bidirectional=False,
+                           bidirectional=True,
                            dropout=drop_prob if num_layers > 1 else 0.)
         
         self.h_projection = nn.Linear(in_features=2*hidden_size, out_features=hidden_size, bias=False)
@@ -102,9 +102,9 @@ class EncoderRNN(nn.Module):
         batch_size = x.size(0)
 
         # Sort by length and pack sequence for RNN
-        #lengths, sort_idx = lengths.sort(0, descending=True)
-        #x = x[sort_idx]     # (batch_size, seq_len, input_size)
-        #x = pack_padded_sequence(x, lengths, batch_first=True)
+        lengths, sort_idx = lengths.sort(0, descending=True)
+        x = x[sort_idx]     # (batch_size, seq_len, input_size)
+        x = pack_padded_sequence(x, lengths, batch_first=True)
 
         # Flatten RNN params
         self.rnn.flatten_parameters()
@@ -113,24 +113,24 @@ class EncoderRNN(nn.Module):
         x, (last_hidden, last_cell) = self.rnn(x)  # (batch_size, seq_len, 2 * hidden_size)
 
         # Unpack and reverse sort
-        #x, _ = pad_packed_sequence(x, batch_first=True, total_length=orig_len)
-        #_, unsort_idx = sort_idx.sort(0)
-        #x = x[unsort_idx]   # (batch_size, seq_len, 2 * hidden_size)
+        x, _ = pad_packed_sequence(x, batch_first=True, total_length=orig_len)
+        _, unsort_idx = sort_idx.sort(0)
+        x = x[unsort_idx]   # (batch_size, seq_len, 2 * hidden_size)
 
         # Apply dropout (RNN applies dropout after all but the last layer)
         #enc_hiddens = F.dropout(x, self.drop_prob, self.training)
 
         #Concatenate last hidden state of last encoder layer
-        #last_hidden = last_hidden.contiguous().view(self.rnn.num_layers, 2, batch_size, self.rnn.hidden_size)  # (num_layers, num_directions=2, batch_size, hidden_size)
-        #last_hidden = torch.cat((last_hidden[:,0:1,:,:], last_hidden[:,1:2,:,:]), dim=-1).squeeze(1)  # (num_layers, batch_size, 2 * hidden_size)
-        #last_cell = last_cell.contiguous().view(self.rnn.num_layers, 2, batch_size, self.rnn.hidden_size)  # (num_layers, num_directions=2, batch_size, hidden_size)
-        #last_cell = torch.cat((last_cell[:,0:1,:,:], last_cell[:,1:2,:,:]), dim=-1).squeeze(1) # (num_layers, batch_size, 2 * hidden_size)
+        last_hidden = last_hidden.contiguous().view(self.rnn.num_layers, 2, batch_size, self.rnn.hidden_size)  # (num_layers, num_directions=2, batch_size, hidden_size)
+        last_hidden = torch.cat((last_hidden[:,0:1,:,:], last_hidden[:,1:2,:,:]), dim=-1).squeeze(1)  # (num_layers, batch_size, 2 * hidden_size)
+        last_cell = last_cell.contiguous().view(self.rnn.num_layers, 2, batch_size, self.rnn.hidden_size)  # (num_layers, num_directions=2, batch_size, hidden_size)
+        last_cell = torch.cat((last_cell[:,0:1,:,:], last_cell[:,1:2,:,:]), dim=-1).squeeze(1) # (num_layers, batch_size, 2 * hidden_size)
 
         #Project last hidden and cell state to get initial decoder hidden and cell state
-        #dec_init_hidden = self.h_projection(last_hidden)
-        #dec_init_cell = self.c_projection(last_cell)
-        #dec_init_state = (dec_init_hidden, dec_init_cell)
-        dec_init_state = (last_hidden, last_cell)
+        dec_init_hidden = self.h_projection(last_hidden)
+        dec_init_cell = self.c_projection(last_cell)
+        dec_init_state = (dec_init_hidden, dec_init_cell)
+        #dec_init_state = (last_hidden, last_cell)
 
         return x, dec_init_state
 

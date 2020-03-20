@@ -167,7 +167,7 @@ def main(args):
                 batch_size = cw_idxs.size(0)
 
                 # Setup for forward
-                src_idxs = cw_idxs[:, :1]
+                src_idxs = cw_idxs[:, :4]
                 #src_idxs = cw_idxs
                 copy_idxs = torch.cat((torch.zeros((batch_size, 1), device=device, dtype=torch.long), src_idxs, torch.zeros((batch_size, 1), device=device, dtype=torch.long)), dim=-1)
                 copy_idxs[:,0] = SOS
@@ -190,13 +190,13 @@ def main(args):
                 
                 print("Context:")
                 print(src_idxs[0])
-                print(getWords(src_idxs[0].squeeze().tolist()))
+                print(getWords(src_idxs[0].tolist()))
                 print("Question:")
                 print(tgt_idxs[0])
-                print(getWords(tgt_idxs[0].squeeze().tolist()))
+                print(getWords(tgt_idxs[0].tolist()))
                 print("Predicted:")
                 print(log_p[0].argmax(-1))
-                print(getWords(log_p[0].argmax(-1).squeeze().tolist()))
+                print(getWords(log_p[0].argmax(-1).tolist()))
                 
                 
                 log_p = log_p.contiguous().view(-1, log_p.size(-1))
