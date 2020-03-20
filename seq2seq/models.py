@@ -294,6 +294,7 @@ class Seq2SeqAttn(nn.Module):
         o_prev = torch.zeros(batch_size, 1, self.hidden_size, device=self.device)
         
         enc_hiddens_proj = self.att_projection(self.enc_hiddens)
+        #enc_hiddens_proj = self.enc_hiddens
 
         dec_state = dec_init_state        #(batch_size, hidden_size)
         
