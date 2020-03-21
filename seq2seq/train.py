@@ -169,13 +169,13 @@ def main(args):
                 batch_size = cw_idxs.size(0)
 
                 # Setup for forward
-                src_idxs = cw_idxs
+                src_idxs = cw_idxs[:,:1]
                 #src_idxs = cw_idxs
                 copy_idxs = torch.cat((torch.zeros((batch_size, 1), device=device, dtype=torch.long), src_idxs, torch.zeros((batch_size, 1), device=device, dtype=torch.long)), dim=-1)
                 copy_idxs[:,0] = SOS
                 copy_idxs[:,-1] = EOS
-                tgt_idxs = qw_idxs[:, :-1]
-                tgt_idxs_y = qw_idxs[:, 1:]
+                tgt_idxs = copy_idxs[:, :-1]
+                tgt_idxs_y = copy_idxs[:, 1:]
 
                 optimizer.zero_grad()
                 
