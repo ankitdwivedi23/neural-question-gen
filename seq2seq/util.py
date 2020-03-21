@@ -589,7 +589,7 @@ def TeacherForce(model, word2idx_dict, idx2word_dict, cw_idx, qw_idx, device):
 
     print(sent)
 
-def greedyDecode(model, word2idx_dict, idx2word_dict, cw_idx, device):
+def greedy_decode(model, word2idx_dict, idx2word_dict, cw_idx, device):
     SOS = "--SOS--"
     EOS = "--EOS--"
     max_len = 10

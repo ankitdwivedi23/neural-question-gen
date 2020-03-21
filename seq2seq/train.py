@@ -79,8 +79,8 @@ def main(args):
     word2Idx = json.loads(open(args.word2idx_file).read())
     Idx2Word = {v: k for (k,v) in word2Idx.items()}
     
-    vocab_size = len(word2Idx)
-    #vocab_size = word_vectors.size(0)
+    #vocab_size = len(word2Idx)
+    vocab_size = word_vectors.size(0)
     print(f"Vocab size: {vocab_size}")
 
     def getWords(idxList):
@@ -95,8 +95,8 @@ def main(args):
                     hidden_size=args.hidden_size,
                     output_size=vocab_size,
                     device=device,
-                    drop_prob=0.0,
-                    num_layers=1)
+                    drop_prob=0.3,
+                    num_layers=2)
         elif args.model_type == "seq2seq_attn":
             return Seq2SeqAttn(word_vectors=word_vectors,
                     hidden_size=args.hidden_size,
@@ -169,7 +169,7 @@ def main(args):
                 batch_size = cw_idxs.size(0)
 
                 # Setup for forward
-                src_idxs = cw_idxs
+                src_idxs = cw_idxs[:,:100]
                 #src_idxs = cw_idxs
                 copy_idxs = torch.cat((torch.zeros((batch_size, 1), device=device, dtype=torch.long), src_idxs, torch.zeros((batch_size, 1), device=device, dtype=torch.long)), dim=-1)
                 copy_idxs[:,0] = SOS
@@ -190,13 +190,13 @@ def main(args):
                     log_p = model(src_idxs, tgt_idxs, src_mask, tgt_mask)  #(batch_size, q_len, vocab_size)
                 
                 
-                print("Context:")
+                print("Train Context:")
                 print(src_idxs[0])
                 print(getWords(src_idxs[0].tolist()))
-                print("Question:")
+                print("Train Question:")
                 print(tgt_idxs[0])
                 print(getWords(tgt_idxs[0].tolist()))
-                print("Predicted:")
+                print("Train Predicted:")
                 print(log_p[0].argmax(-1))
                 print(getWords(log_p[0].argmax(-1).tolist()))
                 
@@ -283,16 +283,16 @@ def main(args):
                     #print(getWords(re_cw_idxs[batch_size-1].squeeze().tolist()))
                     #print(getWords(qw_idxs[batch_size-1].squeeze().tolist()))
                     #util.evaluateRandomly(model, word2Idx, Idx2Word, re_cw_idxs[batch_size-1].unsqueeze(0), device)
-                    
-                '''
+                
+
                 # perform validation
                 if train_iter % args.valid_niter == 0:
-                    log.info('epoch %d, iter %d, cum. loss %.2f, cum. ppl %.2f cum. examples %d' % (epoch, train_iter,
-                                                                                            cum_loss / cum_examples,
-                                                                                            np.exp(cum_loss / cum_tgt_words),
-                                                                                            cum_examples))
+                    log.info('epoch %d, iter %d, totat loss %.2f, total ppl %.2f total examples %d' % (epoch, train_iter,
+                                                                                            total_loss / total_examples,
+                                                                                            np.exp(total_loss / total_words),
+                                                                                            total_examples))
 
-                    cum_loss = cum_examples = cum_tgt_words = 0.
+                    total_loss = total_examples = total_words = 0.
                     valid_num += 1
 
                     print('begin validation ...', file=sys.stderr)
@@ -340,7 +340,87 @@ def main(args):
                 if epoch == args.num_epochs:
                     log.info('reached maximum number of epochs!')
                     exit(0)
-                '''
+
+def evaluate(model, data_loader, device, use_squad_v2):
+    """ Evaluate on dev questions
+    @param model (Module): Question Generation Model
+    @param data_loader (DataLoader): DataLoader to load dev examples in batches
+    @param device (string): 'cuda:0' or 'cpu'
+    @param use_squad_v2 (bool): boolean flag to indicate whether to use SQuAD 2.0 
+    @returns results (dictionary of on dev questions)
+    """
+    nll_meter = util.AverageMeter()
+
+    was_training = model.training
+    model.eval()
+
+    total_loss = 0.
+    total_words = 0.
+    total_examples = 0.
+
+    # no_grad() signals backend to throw away all gradients
+    with torch.no_grad():
+        for cw_idxs, cc_idxs, qw_idxs, qc_idxs, y1, y2, ids in data_loader:
+            
+            cw_idxs = cw_idxs.to(device)
+            qw_idxs = qw_idxs.to(device)
+            batch_size = cw_idxs.size(0)
+            
+            # Setup for forward
+            src_idxs = cw_idxs[:,:100]
+            #src_idxs = cw_idxs
+            copy_idxs = torch.cat((torch.zeros((batch_size, 1), device=device, dtype=torch.long), src_idxs, torch.zeros((batch_size, 1), device=device, dtype=torch.long)), dim=-1)
+            copy_idxs[:,0] = SOS
+            copy_idxs[:,-1] = EOS
+            tgt_idxs = copy_idxs[:, :-1]
+            tgt_idxs_y = copy_idxs[:, 1:]
+            
+            src_mask = src_idxs != PAD
+            tgt_mask = tgt_idxs != PAD
+
+
+            # Forward
+            log_p = model(src_idxs, tgt_idxs)        #(batch_size, q_len, vocab_size)
+
+            print("Validation Context:")
+            print(src_idxs[0])
+            print(getWords(src_idxs[0].tolist()))
+            print("Validation Question:")
+            print(tgt_idxs[0])
+            print(getWords(tgt_idxs[0].tolist()))
+            print("Validation Predicted:")
+            print(log_p[0].argmax(-1))
+            print(getWords(log_p[0].argmax(-1).tolist()))
+
+            log_p = log_p.contiguous().view(-1, log_p.size(-1))
+            tgt_idxs_y = tgt_idxs_y.contiguous().view(-1)
+            tgt_no_pad = tgt_idxs_y != PAD
+            tgt_len = tgt_no_pad.sum(-1)
+
+            batch_words = torch.sum(tgt_len).item()
+            total_words += batch_words
+            total_examples += batch_size
+            
+            batch_loss = F.nll_loss(log_p, tgt_idxs_y, ignore_index=0, reduction='sum')
+            loss = batch_loss / batch_words
+            nll_meter.update(loss.item(), batch_words)
+
+            # Calculate perplexity        
+            batch_loss_val = batch_loss.item()
+            total_loss += batch_loss_val
+
+        ppl = np.exp(total_loss / total_words)
+
+    results_list = [('NLL', nll_meter.avg), \
+                ('PPL', ppl)]
+    results = OrderedDict(results_list)
+
+    if was_training:
+        model.train()
+
+    return results
+
+#########################################################################################################
 
 def gruMain(args):
     # Set up logging and devices
@@ -432,58 +512,6 @@ def gruMain(args):
         if epoch == args.num_epochs:
             log.info('reached maximum number of epochs!')
 
-
-def evaluate(model, data_loader, device, use_squad_v2):
-    """ Evaluate on dev questions
-    @param model (Module): Question Generation Model
-    @param data_loader (DataLoader): DataLoader to load dev examples in batches
-    @param device (string): 'cuda:0' or 'cpu'
-    @param use_squad_v2 (bool): boolean flag to indicate whether to use SQuAD 2.0 
-    @returns results (dictionary of on dev questions)
-    """
-    nll_meter = util.AverageMeter()
-
-    was_training = model.training
-    model.eval()
-
-    cum_loss = 0.
-    cum_tgt_words = 0.
-
-    # no_grad() signals backend to throw away all gradients
-    with torch.no_grad():
-        for cw_idxs, re_cw_idxs, cc_idxs, qw_idxs, qc_idxs, y1, y2, ids in data_loader:
-            # Setup for forward
-            re_cw_idxs = re_cw_idxs.to(device)
-            qw_idxs = qw_idxs.to(device)
-            batch_size = cw_idxs.size(0)
-            
-            # Forward
-            log_p = model(cw_idxs, qw_idxs)        #(batch_size, q_len, vocab_size)
-                
-            log_p = log_p.contiguous().view(log_p.size(0) * log_p.size(1), log_p.size(2))
-            qw_idxs_target = qw_idxs[:, 1:]     # omitting leading `SOS`
-            qw_idxs_target = qw_idxs_target.contiguous().view(qw_idxs_target.size(0) * qw_idxs_target.size(1))
-            loss = F.nll_loss(log_p, qw_idxs_target, ignore_index=0, reduction='sum')
-            nll_meter.update(loss.item(), batch_size)
-
-            q_mask = torch.zeros_like(qw_idxs_target) != qw_idxs_target
-            q_len = q_mask.sum(-1)
-
-            # Calculate perplexity        
-            cum_loss += loss.item()
-            tgt_word_num_to_predict = torch.sum(q_len).item()
-            cum_tgt_words += tgt_word_num_to_predict
-
-        ppl = np.exp(cum_loss / cum_tgt_words)
-
-    results_list = [('NLL', nll_meter.avg), \
-                ('PPL', ppl)]
-    results = OrderedDict(results_list)
-
-    if was_training:
-        model.train()
-
-    return results
 
 if __name__ == '__main__':
     main(get_train_args())

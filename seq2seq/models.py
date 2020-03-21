@@ -14,6 +14,9 @@ import random
 
 from typing import List, Tuple, Dict, Set, Union
 
+PAD = 0
+SOS = 2
+EOS = 3
 
 class Seq2SeqGru(nn.Module):
     """Baseline seq2seq model
@@ -178,7 +181,7 @@ class Seq2Seq(nn.Module):
 
 
     def encode(self, cw_idxs):
-        c_mask = torch.zeros_like(cw_idxs, device=self.device) != cw_idxs
+        c_mask = cw_idxs != PAD
         c_len = c_mask.sum(-1)
 
         c_emb = self.emb(cw_idxs)         # (batch_size, c_len, hidden_size)
@@ -267,7 +270,7 @@ class Seq2SeqAttn(nn.Module):
 
     
     def encode(self, cw_idxs):
-        c_mask = torch.zeros_like(cw_idxs) != cw_idxs
+        c_mask = cw_idxs != PAD
         c_len = c_mask.sum(-1)
 
         c_emb = self.emb(cw_idxs)         # (batch_size, c_len, hidden_size)
