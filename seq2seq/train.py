@@ -34,6 +34,57 @@ PAD = 0
 SOS = 2
 EOS = 3
 
+args = get_train_args()
+
+# Set up logging and devices
+args.save_dir = util.get_save_dir(args.save_dir, args.name, training=True)
+log = util.get_logger(args.save_dir, args.name)
+device, args.gpu_ids = util.get_available_devices()
+log.info(f'Args: {dumps(vars(args), indent=4, sort_keys=True)}')
+args.batch_size *= max(1, len(args.gpu_ids))
+
+# Set random seed
+log.info(f'Using random seed {args.seed}...')
+random.seed(args.seed)
+np.random.seed(args.seed)
+torch.manual_seed(args.seed)
+torch.cuda.manual_seed_all(args.seed)    
+
+# Get embeddings
+log.info('Loading embeddings...')
+word_vectors = util.torch_from_json(args.word_emb_file)
+
+log.info('Loading word2Idx...')
+word2Idx = json.loads(open(args.word2idx_file).read())
+Idx2Word = {v: k for (k,v) in word2Idx.items()}
+
+#vocab_size = len(word2Idx)
+vocab_size = word_vectors.size(0)
+print(f"Vocab size: {vocab_size}")
+
+
+def getWords(idxList):
+        words = []
+        for i in idxList:
+            words.append(Idx2Word[i])
+        return words
+
+def create_new_model():
+        if args.model_type == "seq2seq":
+            return Seq2Seq(word_vectors=word_vectors,
+                    hidden_size=args.hidden_size,
+                    output_size=vocab_size,
+                    device=device,
+                    drop_prob=0.3,
+                    num_layers=2)
+        elif args.model_type == "seq2seq_attn":
+            return Seq2SeqAttn(word_vectors=word_vectors,
+                    hidden_size=args.hidden_size,
+                    output_size=vocab_size,
+                    device=device)
+        elif args.model_type == "transformer":
+            return TransformerModel(vocab_size, device)
+
 def percentile(t: torch.tensor, q: float) -> Union[int, float]:
     """
     Return the ``q``-th percentile of the flattened input tensor's data.
@@ -54,58 +105,10 @@ def percentile(t: torch.tensor, q: float) -> Union[int, float]:
     result = t.view(-1).kthvalue(k)
     return result
 
-def main(args):    
+def main():    
     #torch.set_default_dtype(torch.float64)
-
-    # Set up logging and devices
-    args.save_dir = util.get_save_dir(args.save_dir, args.name, training=True)
-    log = util.get_logger(args.save_dir, args.name)
-    device, args.gpu_ids = util.get_available_devices()
-    log.info(f'Args: {dumps(vars(args), indent=4, sort_keys=True)}')
-    args.batch_size *= max(1, len(args.gpu_ids))
-
-    # Set random seed
-    log.info(f'Using random seed {args.seed}...')
-    random.seed(args.seed)
-    np.random.seed(args.seed)
-    torch.manual_seed(args.seed)
-    torch.cuda.manual_seed_all(args.seed)
-
-    # Get embeddings
-    log.info('Loading embeddings...')
-    word_vectors = util.torch_from_json(args.word_emb_file)
-
-    log.info('Loading word2Idx...')
-    word2Idx = json.loads(open(args.word2idx_file).read())
-    Idx2Word = {v: k for (k,v) in word2Idx.items()}
     
-    #vocab_size = len(word2Idx)
-    vocab_size = word_vectors.size(0)
-    print(f"Vocab size: {vocab_size}")
-
-    def getWords(idxList):
-        words = []
-        for i in idxList:
-            words.append(Idx2Word[i])
-        return words
-    
-    def create_new_model():
-        if args.model_type == "seq2seq":
-            return Seq2Seq(word_vectors=word_vectors,
-                    hidden_size=args.hidden_size,
-                    output_size=vocab_size,
-                    device=device,
-                    drop_prob=0.3,
-                    num_layers=2)
-        elif args.model_type == "seq2seq_attn":
-            return Seq2SeqAttn(word_vectors=word_vectors,
-                    hidden_size=args.hidden_size,
-                    output_size=vocab_size,
-                    device=device)
-        elif args.model_type == "transformer":
-            return TransformerModel(vocab_size, device)
-
-    # Get model
+    #  Get model
     log.info('Building model...')
     model = create_new_model()    
     model = nn.DataParallel(model, args.gpu_ids)
@@ -514,4 +517,4 @@ def gruMain(args):
 
 
 if __name__ == '__main__':
-    main(get_train_args())
+    main()
