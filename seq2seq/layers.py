@@ -115,7 +115,7 @@ class EncoderRNN(nn.Module):
         #print(x)
 
         # Flatten RNN params
-        #self.rnn.flatten_parameters()
+        self.rnn.flatten_parameters()
 
         # Apply RNN
         x, (last_hidden, last_cell) = self.rnn(x)  # (batch_size, seq_len, 2 * hidden_size)
@@ -157,7 +157,7 @@ class DecoderRNN(nn.Module):
         self.rnn = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True, dropout=drop_prob)
 
     def forward(self, input, hidden):
-        #self.rnn.flatten_parameters()
+        self.rnn.flatten_parameters()
         output, hidden = self.rnn(input, hidden)
         return output, hidden
 
