@@ -338,14 +338,15 @@ class Seq2SeqAttn(nn.Module):
         """
         combined_output = None
         o_t, dec_state = self.decoder(Ybar_t, dec_state)                                            # o_t => (batch_size, 1, hidden_size)
-        dec_hidden = dec_state[0]
-        dec_hidden = dec_hidden.transpose(0,1)
-        print(f"Are LSTM output and hidden equal: {torch.all(o_t.eq(dec_hidden))}")
+        #dec_hidden = dec_state[0]
+        #dec_hidden = dec_hidden.transpose(0,1)
+        #print(f"Are LSTM output and hidden equal: {torch.all(o_t.eq(dec_hidden))}")
         e_t = torch.bmm(o_t, torch.transpose(enc_hiddens_proj, dim0=1, dim1=2)).squeeze(dim=1)      # e_t => (batch_size, c_len)
 
         # Set e_t to -inf where enc_masks has 0
         if self.enc_masks is not None:
-            e_t.data.masked_fill_(self.enc_masks == 0, -float('inf'))
+            e_t = e_t.masked_fill(self.enc_masks == 0, float('-inf'))
+            #e_t.data.masked_fill_(self.enc_masks == 0, -float('inf'))
 
         #print("Before softmax:")
         #print(e_t.shape)
