@@ -27,19 +27,19 @@ def get_setup_args():
                         default='http://nlp.stanford.edu/data/glove.840B.300d.zip')
     parser.add_argument('--dev_meta_file',
                         type=str,
-                        default='./data/reduced/minisample/dev_meta.json')
+                        default='./data/reduced/full/dev_meta.json')
     parser.add_argument('--test_meta_file',
                         type=str,
-                        default='./data/reduced/minisample/test_meta.json')
+                        default='./data/reduced/full/test_meta.json')
     parser.add_argument('--word2idx_file',
                         type=str,
-                        default='./data/reduced/minisample/word2idx.json')
+                        default='./data/reduced/full/word2idx.json')
     parser.add_argument('--char2idx_file',
                         type=str,
-                        default='./data/reduced/minisample/char2idx.json')
+                        default='./data/reduced/full/char2idx.json')
     parser.add_argument('--answer_file',
                         type=str,
-                        default='./data/reduced/minisample/answer.json')
+                        default='./data/reduced/full/answer.json')
     parser.add_argument('--para_limit',
                         type=int,
                         default=400,
@@ -156,7 +156,7 @@ def get_train_args():
                         help='Decay rate for exponential moving average of parameters.')
     parser.add_argument('--word2idx_file',
                         type=str,
-                        default='./data/reduced/minisample/word2idx.json')
+                        default='./data/reduced/full/word2idx.json')
 
     args = parser.parse_args()
 
@@ -190,7 +190,7 @@ def get_test_args():
                         help='Name for submission file.')
     parser.add_argument('--word2idx_file',
                         type=str,
-                        default='./data/reduced/minisample/word2idx.json')
+                        default='./data/reduced/full/word2idx.json')
 
     # Require load_path for test.py
     args = parser.parse_args()
@@ -204,28 +204,28 @@ def add_common_args(parser):
     """Add arguments common to all 3 scripts: setup.py, train.py, test.py"""
     parser.add_argument('--train_record_file',
                         type=str,
-                        default='./data/reduced/minisample/train.npz')
+                        default='./data/reduced/full/train.npz')
     parser.add_argument('--dev_record_file',
                         type=str,
-                        default='./data/reduced/minisample/dev.npz')
+                        default='./data/reduced/full/dev.npz')
     parser.add_argument('--test_record_file',
                         type=str,
-                        default='./data/reduced/minisample/test.npz')
+                        default='./data/reduced/full/test.npz')
     parser.add_argument('--word_emb_file',
                         type=str,
-                        default='./data/reduced/minisample/word_emb.json')
+                        default='./data/reduced/full/word_emb.json')
     parser.add_argument('--char_emb_file',
                         type=str,
-                        default='./data/reduced/minisample/char_emb.json')
+                        default='./data/reduced/full/char_emb.json')
     parser.add_argument('--train_eval_file',
                         type=str,
-                        default='./data/reduced/minisample/train_eval.json')
+                        default='./data/reduced/full/train_eval.json')
     parser.add_argument('--dev_eval_file',
                         type=str,
-                        default='./data/reduced/minisample/dev_eval.json')
+                        default='./data/reduced/full/dev_eval.json')
     parser.add_argument('--test_eval_file',
                         type=str,
-                        default='./data/reduced/minisample/test_eval.json')
+                        default='./data/reduced/full/test_eval.json')
 
 
 def add_train_test_args(parser):

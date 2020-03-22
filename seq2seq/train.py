@@ -107,8 +107,7 @@ def percentile(t: torch.tensor, q: float) -> Union[int, float]:
     result = t.view(-1).kthvalue(k)
     return result
 
-def main():    
-    print("MAIN CALLED!!!!!!!")
+def main():
     #torch.set_default_dtype(torch.float64)
     
     #  Get model
@@ -201,7 +200,7 @@ def main():
                     log_p = model(src_idxs, tgt_idxs, src_mask, tgt_mask)  #(batch_size, q_len, vocab_size)
                 
                 
-                
+                '''
                 print("Train Context:")
                 print(src_idxs[0])
                 print(getWords(src_idxs[0].tolist()))
@@ -211,6 +210,7 @@ def main():
                 print("Train Predicted:")
                 print(log_p[0].argmax(-1))
                 print(getWords(log_p[0].argmax(-1).tolist()))
+                '''
                           
                 
                 log_p = log_p.contiguous().view(-1, log_p.size(-1))
@@ -362,6 +362,8 @@ def main():
                         '''
             if epoch == args.num_epochs:
                 log.info('reached maximum number of epochs!')
+                log.info('save the model to [%s]' % model_save_path)
+                saver.save(step, model, results[args.metric_name], device)
                 exit(0)
 
 def evaluate(model, data_loader, device, use_squad_v2):
