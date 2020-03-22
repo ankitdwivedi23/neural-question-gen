@@ -195,7 +195,7 @@ def main():
                     log_p = model(src_idxs, tgt_idxs, src_mask, tgt_mask)  #(batch_size, q_len, vocab_size)
                 
                 
-                
+                '''
                 print("Train Context:")
                 print(src_idxs[0])
                 print(getWords(src_idxs[0].tolist()))
@@ -205,7 +205,7 @@ def main():
                 print("Train Predicted:")
                 print(log_p[0].argmax(-1))
                 print(getWords(log_p[0].argmax(-1).tolist()))
-                              
+                '''              
                 
                 log_p = log_p.contiguous().view(-1, log_p.size(-1))
 
