@@ -152,7 +152,7 @@ def main():
                                    collate_fn=collate_fn)
     dev_dataset = SQuAD(args.dev_record_file, args.use_squad_v2)
     dev_loader = data.DataLoader(dev_dataset,
-                                 batch_size=args.batch_size,
+                                 batch_size=64,
                                  shuffle=False,
                                  num_workers=args.num_workers,
                                  collate_fn=collate_fn)
@@ -178,7 +178,7 @@ def main():
                 # Setup for forward
                 src_idxs = cw_idxs[:,:10]
                 #src_idxs = cw_idxs
-                copy_idxs = torch.cat((torch.zeros((batch_size, 1), device=device, dtype=torch.long), src_idxs, torch.zeros((batch_size, 1), device=device, dtype=torch.long)), dim=-1)
+                copy_idxs = torch.cat((torch.zeros((minibatch_size, 1), device=device, dtype=torch.long), src_idxs, torch.zeros((minibatch_size, 1), device=device, dtype=torch.long)), dim=-1)
                 copy_idxs[:,0] = SOS
                 copy_idxs[:,-1] = EOS
                 tgt_idxs = copy_idxs[:, :-1]
