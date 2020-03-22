@@ -283,7 +283,7 @@ def main():
                         '''
                         
                         log.info('epoch %d, iter %d, avg. loss %.2f, avg. ppl %.2f ' \
-                        'cum. examples %d, speed %.2f words/sec, time elapsed %.2f sec' % (epoch, train_iter,
+                        'cum. examples %d, speed %.2f words/sec, time elapsed %.2f sec' % (epoch, train_iter_actual,
                                                                                             report_loss / report_words,
                                                                                             math.exp(report_loss / report_words),
                                                                                             total_examples,
@@ -300,7 +300,7 @@ def main():
 
                     # perform validation
                     if args.valid_niter > 0 and train_iter_actual % args.valid_niter == 0:
-                        log.info('epoch %d, iter %d, totat loss %.2f, total ppl %.2f total examples %d' % (epoch, train_iter,
+                        log.info('epoch %d, iter %d, totat loss %.2f, total ppl %.2f total examples %d' % (epoch, train_iter_actual,
                                                                                                 total_loss / total_examples,
                                                                                                 np.exp(total_loss / total_words),
                                                                                                 total_examples))
@@ -313,7 +313,7 @@ def main():
                         # compute dev metrics
                         results = evaluate(model, dev_loader, device, args.use_squad_v2)
 
-                        log.info('validation: iter %d, dev. ppl %f' % (train_iter, results[args.metric_name]))
+                        log.info('validation: iter %d, dev. NLL %f, dev. ppl %f' % (train_iter, results['NLL'], results['PPL']))
 
                         if saver.is_best(results[args.metric_name]):
                             patience = 0
