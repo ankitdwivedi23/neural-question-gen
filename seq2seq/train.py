@@ -296,7 +296,7 @@ def main():
                 
 
                 # perform validation
-                if train_iter_actual % args.valid_niter == 0:
+                if args.valid_niter > 0 and train_iter_actual % args.valid_niter == 0:
                     log.info('epoch %d, iter %d, totat loss %.2f, total ppl %.2f total examples %d' % (epoch, train_iter,
                                                                                             total_loss / total_examples,
                                                                                             np.exp(total_loss / total_words),
