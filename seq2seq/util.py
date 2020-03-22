@@ -22,6 +22,9 @@ Hypothesis = namedtuple('Hypothesis', ['value', 'score'])
 from typing import List, Tuple, Dict, Set, Union
 from torchtext.data.metrics import bleu_score
 
+SOS = "--SOS--"
+EOS = "--EOS--"
+
 class SQuAD(data.Dataset):
     """Stanford Question Answering Dataset (SQuAD).
 
@@ -555,8 +558,6 @@ def torch_from_json(path, dtype=torch.float32):
 
 
 def TeacherForce(model, word2idx_dict, idx2word_dict, cw_idx, qw_idx, device):
-    SOS = "--SOS--"
-    EOS = "--EOS--"
     max_len = 2
 
     q = qw_idx.squeeze().tolist()
@@ -590,8 +591,6 @@ def TeacherForce(model, word2idx_dict, idx2word_dict, cw_idx, qw_idx, device):
     print(sent)
 
 def greedy_decode(model, word2idx_dict, idx2word_dict, cw_idx, device):
-    SOS = "--SOS--"
-    EOS = "--EOS--"
     max_len = 10
 
     if model.module.model_type in ['seq2seq', 'seq2seq_attn']:
@@ -622,8 +621,6 @@ def greedy_decode(model, word2idx_dict, idx2word_dict, cw_idx, device):
     #print(sent)
 
 def evaluate(model, word2idx_dict, idx2word_dict, cw_idx, device):
-    SOS = "--SOS--"
-    EOS = "--EOS--"
     max_len = 30
 
     if model.module.model_type in ['seq2seq', 'seq2seq_attn']:
@@ -683,6 +680,90 @@ def estimateBLEU(model, set_name, word2idx_dict, idx2word_dict, cw_idx_list, qw_
         print("BLEU-" + str(i) + " on " + set_name + " :" + str(bleu_test))
     return
 
+def beam_search(model, cw_idx, word2idx_dict, idx2word_dict, device, beam_size: int=5, max_decoding_time_step: int=70) -> List[Hypothesis]:
+        
+        src_encodings, dec_init_vec = model.module.encode(cw_idx)
+        #src_encodings_att_linear = self.att_projection(src_encodings)
+
+        h_tm1 = dec_init_vec
+        #att_tm1 = torch.zeros(1, self.hidden_size, device=self.device)
+
+        eos_id = word2idx_dict[EOS]
+        vocab_size = model.module.word_vectors.size(0)
+
+        hypotheses = [[SOS]]
+        hyp_scores = torch.zeros(len(hypotheses), dtype=torch.float, device=device)
+        completed_hypotheses = []
+
+        t = 0
+        while len(completed_hypotheses) < beam_size and t < max_decoding_time_step:
+            t += 1
+            hyp_num = len(hypotheses)
+
+            #exp_src_encodings = src_encodings.expand(hyp_num,
+            #                                         src_encodings.size(1),
+            #                                         src_encodings.size(2))
+
+            #exp_src_encodings_att_linear = src_encodings_att_linear.expand(hyp_num,
+            #                                                               src_encodings_att_linear.size(1),
+            #                                                               src_encodings_att_linear.size(2))
+
+            y_tm1 = torch.tensor([[word2idx_dict[hyp[-1]]] for hyp in hypotheses], dtype=torch.long, device=device)
+
+            #x = torch.cat([y_t_embed, att_tm1], dim=-1)
+
+            #(h_t, cell_t), att_t, _  = self.step(x, h_tm1,
+            #                                          exp_src_encodings, exp_src_encodings_att_linear, enc_masks=None)
+
+            (h_t, cell_t), log_p_t = model.module.decode(h_tm1, y_tm1)
+
+            # log probabilities over target words
+            #log_p_t = F.log_softmax(self.target_vocab_projection(att_t), dim=-1)
+
+            live_hyp_num = beam_size - len(completed_hypotheses)
+            contiuating_hyp_scores = (hyp_scores.unsqueeze(1).expand_as(log_p_t) + log_p_t).view(-1)
+            top_cand_hyp_scores, top_cand_hyp_pos = torch.topk(contiuating_hyp_scores, k=live_hyp_num)
+
+            prev_hyp_ids = top_cand_hyp_pos / vocab_size
+            hyp_word_ids = top_cand_hyp_pos % vocab_size
+
+            new_hypotheses = []
+            live_hyp_ids = []
+            new_hyp_scores = []
+
+            for prev_hyp_id, hyp_word_id, cand_new_hyp_score in zip(prev_hyp_ids, hyp_word_ids, top_cand_hyp_scores):
+                prev_hyp_id = prev_hyp_id.item()
+                hyp_word_id = hyp_word_id.item()
+                cand_new_hyp_score = cand_new_hyp_score.item()
+
+                hyp_word = idx2word_dict[hyp_word_id]
+                new_hyp_sent = hypotheses[prev_hyp_id] + [hyp_word]
+                if hyp_word == EOS:
+                    completed_hypotheses.append(Hypothesis(value=new_hyp_sent[1:-1],
+                                                           score=cand_new_hyp_score))
+                else:
+                    new_hypotheses.append(new_hyp_sent)
+                    live_hyp_ids.append(prev_hyp_id)
+                    new_hyp_scores.append(cand_new_hyp_score)
+
+            if len(completed_hypotheses) == beam_size:
+                break
+
+            live_hyp_ids = torch.tensor(live_hyp_ids, dtype=torch.long, device=device)
+            h_tm1 = (h_t[live_hyp_ids], cell_t[live_hyp_ids])
+            #att_tm1 = att_t[live_hyp_ids]
+
+            hypotheses = new_hypotheses
+            hyp_scores = torch.tensor(new_hyp_scores, dtype=torch.float, device=device)
+
+        if len(completed_hypotheses) == 0:
+            completed_hypotheses.append(Hypothesis(value=hypotheses[0][1:],
+                                                   score=hyp_scores[0].item()))
+
+        completed_hypotheses.sort(key=lambda hyp: hyp.score, reverse=True)
+
+        return completed_hypotheses
+
 def beamSearch(model, word2idx_dict, idx2word_dict, cw_idx, device, beam_size: int=1, max_decoding_time_step: int=70)-> List[Hypothesis]:
     """Discretize soft predictions to get question text.
 
@@ -701,8 +782,6 @@ def beamSearch(model, word2idx_dict, idx2word_dict, cw_idx, device, beam_size: i
                 value: List[str]: the decoded target question, represented as a list of words
                 score: float: the log-likelihood of the target question
     """
-    SOS = "--SOS--"
-    EOS = "--EOS--"
 
     if model.module.model_type in ['seq2seq', 'seq2seq_attn']:
          c_enc, dec_init_state = model.module.encode(cw_idx)     # (1, c_len, 2 * hidden_size)
