@@ -391,6 +391,7 @@ def evaluate(model, data_loader, device, use_squad_v2):
             copy_idxs[:,-1] = EOS
             tgt_idxs = copy_idxs[:, :-1]
             tgt_idxs_y = copy_idxs[:, 1:]
+            src_idxs = torch.flip(src_idxs, [1])
             
             src_mask = src_idxs != PAD
             tgt_mask = tgt_idxs != PAD
