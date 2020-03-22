@@ -15,16 +15,16 @@ def get_setup_args():
 
     parser.add_argument('--train_url',
                         type=str,
-                        default='https://github.com/chrischute/squad/full/train-v2.0.json')
+                        default='https://github.com/chrischute/squad/data/train-v2.0.json')
     parser.add_argument('--dev_url',
                         type=str,
-                        default='https://github.com/chrischute/squad/full/dev-v2.0.json')
+                        default='https://github.com/chrischute/squad/data/dev-v2.0.json')
     parser.add_argument('--test_url',
                         type=str,
-                        default='https://github.com/chrischute/squad/full/test-v2.0.json')
+                        default='https://github.com/chrischute/squad/data/test-v2.0.json')
     parser.add_argument('--glove_url',
                         type=str,
-                        default='http://nlp.stanford.edu/full/glove.840B.300d.zip')
+                        default='http://nlp.stanford.edu/data/glove.840B.300d.zip')
     parser.add_argument('--dev_meta_file',
                         type=str,
                         default='./data/reduced/full/dev_meta.json')
