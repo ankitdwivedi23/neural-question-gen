@@ -15,31 +15,31 @@ def get_setup_args():
 
     parser.add_argument('--train_url',
                         type=str,
-                        default='https://github.com/chrischute/squad/minisample_66/train-v2.0.json')
+                        default='https://github.com/chrischute/squad/full/train-v2.0.json')
     parser.add_argument('--dev_url',
                         type=str,
-                        default='https://github.com/chrischute/squad/minisample_66/dev-v2.0.json')
+                        default='https://github.com/chrischute/squad/full/dev-v2.0.json')
     parser.add_argument('--test_url',
                         type=str,
-                        default='https://github.com/chrischute/squad/minisample_66/test-v2.0.json')
+                        default='https://github.com/chrischute/squad/full/test-v2.0.json')
     parser.add_argument('--glove_url',
                         type=str,
-                        default='http://nlp.stanford.edu/minisample_66/glove.840B.300d.zip')
+                        default='http://nlp.stanford.edu/full/glove.840B.300d.zip')
     parser.add_argument('--dev_meta_file',
                         type=str,
-                        default='./data/dev_meta.json')
+                        default='./data/reduced/full/dev_meta.json')
     parser.add_argument('--test_meta_file',
                         type=str,
-                        default='./data/test_meta.json')
+                        default='./data/reduced/full/test_meta.json')
     parser.add_argument('--word2idx_file',
                         type=str,
-                        default='./data/word2idx.json')
+                        default='./data/reduced/full/word2idx.json')
     parser.add_argument('--char2idx_file',
                         type=str,
-                        default='./data/char2idx.json')
+                        default='./data/reduced/full/char2idx.json')
     parser.add_argument('--answer_file',
                         type=str,
-                        default='./data/answer.json')
+                        default='./data/reduced/full/answer.json')
     parser.add_argument('--para_limit',
                         type=int,
                         default=400,
@@ -152,7 +152,7 @@ def get_train_args():
                         help='Decay rate for exponential moving average of parameters.')
     parser.add_argument('--word2idx_file',
                         type=str,
-                        default='./data/word2idx.json')
+                        default='./data/reduced/full/word2idx.json')
 
     args = parser.parse_args()
 
@@ -186,7 +186,7 @@ def get_test_args():
                         help='Name for submission file.')
     parser.add_argument('--word2idx_file',
                         type=str,
-                        default='./data/word2idx.json')
+                        default='./data/reduced/full/word2idx.json')
 
     # Require load_path for test.py
     args = parser.parse_args()
@@ -200,28 +200,28 @@ def add_common_args(parser):
     """Add arguments common to all 3 scripts: setup.py, train.py, test.py"""
     parser.add_argument('--train_record_file',
                         type=str,
-                        default='./data/train.npz')
+                        default='./data/reduced/full/train.npz')
     parser.add_argument('--dev_record_file',
                         type=str,
-                        default='./data/dev.npz')
+                        default='./data/reduced/full/dev.npz')
     parser.add_argument('--test_record_file',
                         type=str,
-                        default='./data/test.npz')
+                        default='./data/reduced/full/test.npz')
     parser.add_argument('--word_emb_file',
                         type=str,
-                        default='./data/word_emb.json')
+                        default='./data/reduced/full/word_emb.json')
     parser.add_argument('--char_emb_file',
                         type=str,
-                        default='./data/char_emb.json')
+                        default='./data/reduced/full/char_emb.json')
     parser.add_argument('--train_eval_file',
                         type=str,
-                        default='./data/train_eval.json')
+                        default='./data/reduced/full/train_eval.json')
     parser.add_argument('--dev_eval_file',
                         type=str,
-                        default='./data/dev_eval.json')
+                        default='./data/reduced/full/dev_eval.json')
     parser.add_argument('--test_eval_file',
                         type=str,
-                        default='./data/test_eval.json')
+                        default='./data/reduced/full/test_eval.json')
 
 
 def add_train_test_args(parser):
