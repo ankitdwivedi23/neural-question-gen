@@ -75,13 +75,15 @@ def create_new_model():
                     hidden_size=args.hidden_size,
                     output_size=vocab_size,
                     device=device,
-                    drop_prob=0.3,
-                    num_layers=2)
+                    drop_prob=args.drop_prob,
+                    num_layers=args.num_layers)
         elif args.model_type == "seq2seq_attn":
             return Seq2SeqAttn(word_vectors=word_vectors,
                     hidden_size=args.hidden_size,
                     output_size=vocab_size,
-                    device=device)
+                    device=device,
+                    drop_prob=args.drop_prob,
+                    num_layers=args.num_layers)
         elif args.model_type == "transformer":
             return TransformerModel(vocab_size, device)
 
@@ -170,7 +172,7 @@ def main():
 
                 cw_idxs = cw_idxs.to(device)
                 qw_idxs = qw_idxs.to(device)
-                batch_size = cw_idxs.size(0)
+                minibatch_size = cw_idxs.size(0)
                 batch_size_actual += batch_size
 
                 # Setup for forward
@@ -225,13 +227,13 @@ def main():
                 batch_words += minibatch_words
                 
                 minibatch_loss = F.nll_loss(log_p, tgt_idxs_y, ignore_index=0, reduction='sum')
-                loss = minibatch_loss / minibatch_words
+                loss = minibatch_loss / minibatch_size
                 loss.backward()
 
                 batch_loss += minibatch_loss.item()          
 
                 # Backward
-                if train_iter % 4 == 0 or batch_size < args.batch_size:                                        
+                if train_iter % 4 == 0 or minibatch_size < args.batch_size:                                        
                     nn.utils.clip_grad_norm_(model.parameters(), args.max_grad_norm)
                     optimizer.step()
 
@@ -284,7 +286,7 @@ def main():
                         
                         log.info('epoch %d, iter %d, avg. loss %.2f, avg. ppl %.2f ' \
                         'cum. examples %d, speed %.2f words/sec, time elapsed %.2f sec' % (epoch, train_iter_actual,
-                                                                                            report_loss / report_words,
+                                                                                            report_loss / report_examples,
                                                                                             math.exp(report_loss / report_words),
                                                                                             total_examples,
                                                                                             report_words / (time.time() - train_time),
