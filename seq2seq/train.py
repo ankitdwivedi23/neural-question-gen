@@ -108,6 +108,7 @@ def percentile(t: torch.tensor, q: float) -> Union[int, float]:
     return result
 
 def main():    
+    print("MAIN CALLED!!!!!!!")
     #torch.set_default_dtype(torch.float64)
     
     #  Get model
@@ -134,8 +135,10 @@ def main():
     model_save_path = os.path.join(args.save_dir, args.best_model_name)
 
     # Get optimizer and scheduler    
-    # Default project starter code uses Adadelta, but we're going to use Adam
-    optimizer = torch.optim.Adam(model.parameters(), lr=float(args.lr))
+    # Default project starter code uses Adadelta, but we're going to use SGD
+    #optimizer = torch.optim.Adam(model.parameters(), lr=float(args.lr))
+    optimizer = torch.optim.SGD(model.parameters(), lr=float(args.lr))
+    scheduler = sched.MultiStepLR(optimizer, milestones=[i for i in range(args.epoch_start_decay, args.num_epochs + 1)], gamma=0.5)
 
     num_trial = 0
     train_iter = train_iter_actual = batch_size_actual = batch_loss = patience = total_loss = report_loss = batch_words = total_words = report_words = 0
@@ -162,21 +165,24 @@ def main():
     optimizer.zero_grad()
     epoch = step // len(train_dataset)
     while epoch != args.num_epochs:
-        epoch += 1        
-        log.info(f'Starting epoch {epoch}...')
+        epoch += 1
+        scheduler.step()
+        log.info(f"Starting epoch {epoch}, with learning rate {optimizer.param_groups[0]['lr']}")
+
         with torch.enable_grad(), \
                 tqdm(total=len(train_loader.dataset)) as progress_bar:
-            for cw_idxs, cc_idxs, qw_idxs, qc_idxs, y1, y2, ids in train_loader:
+            for cw_idxs, re_cw_idxs, cc_idxs, qw_idxs, qc_idxs, y1, y2, ids in train_loader:
                 
                 train_iter += 1
 
                 cw_idxs = cw_idxs.to(device)
+                re_cw_idxs = re_cw_idxs.to(device)
                 qw_idxs = qw_idxs.to(device)
                 minibatch_size = cw_idxs.size(0)
                 batch_size_actual += minibatch_size
 
                 # Setup for forward
-                src_idxs = cw_idxs[:,:100]
+                src_idxs = re_cw_idxs
                 #src_idxs = cw_idxs
                 #copy_idxs = torch.cat((torch.zeros((minibatch_size, 1), device=device, dtype=torch.long), src_idxs, torch.zeros((minibatch_size, 1), device=device, dtype=torch.long)), dim=-1)
                 #copy_idxs[:,0] = SOS
@@ -318,6 +324,7 @@ def main():
 
                         log.info('validation: iter %d, dev. NLL %f, dev. ppl %f' % (train_iter, results['NLL'], results['PPL']))
 
+                        '''
                         if saver.is_best(results[args.metric_name]):
                             patience = 0
                             log.info('save currently the best model to [%s]' % model_save_path)
@@ -352,10 +359,10 @@ def main():
 
                                 # reset patience
                                 patience = 0
-
-                if epoch == args.num_epochs:
-                    log.info('reached maximum number of epochs!')
-                    exit(0)
+                        '''
+            if epoch == args.num_epochs:
+                log.info('reached maximum number of epochs!')
+                exit(0)
 
 def evaluate(model, data_loader, device, use_squad_v2):
     """ Evaluate on dev questions
@@ -376,14 +383,15 @@ def evaluate(model, data_loader, device, use_squad_v2):
 
     # no_grad() signals backend to throw away all gradients
     with torch.no_grad():
-        for cw_idxs, cc_idxs, qw_idxs, qc_idxs, y1, y2, ids in data_loader:
+        for cw_idxs, re_cw_idxs, cc_idxs, qw_idxs, qc_idxs, y1, y2, ids in data_loader:
             
             cw_idxs = cw_idxs.to(device)
+            re_cw_idxs = re_cw_idxs.to(device)
             qw_idxs = qw_idxs.to(device)
             batch_size = cw_idxs.size(0)
             
             # Setup for forward
-            src_idxs = cw_idxs[:,:100]
+            src_idxs = re_cw_idxs
             #src_idxs = cw_idxs
             #copy_idxs = torch.cat((torch.zeros((batch_size, 1), device=device, dtype=torch.long), src_idxs, torch.zeros((batch_size, 1), device=device, dtype=torch.long)), dim=-1)
             #copy_idxs[:,0] = SOS
@@ -418,8 +426,8 @@ def evaluate(model, data_loader, device, use_squad_v2):
             total_examples += batch_size
             
             batch_loss = F.nll_loss(log_p, tgt_idxs_y, ignore_index=0, reduction='sum')
-            loss = batch_loss / batch_words
-            nll_meter.update(loss.item(), batch_words)
+            loss = batch_loss / batch_size
+            nll_meter.update(loss.item(), batch_size)
 
             # Calculate perplexity        
             batch_loss_val = batch_loss.item()
