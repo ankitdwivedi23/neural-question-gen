@@ -75,8 +75,8 @@ def create_new_model():
                     hidden_size=args.hidden_size,
                     output_size=vocab_size,
                     device=device,
-                    drop_prob=0.3,
-                    num_layers=2)
+                    drop_prob=0.0,
+                    num_layers=1)
         elif args.model_type == "seq2seq_attn":
             return Seq2SeqAttn(word_vectors=word_vectors,
                     hidden_size=args.hidden_size,
@@ -136,7 +136,7 @@ def main():
     optimizer = torch.optim.Adam(model.parameters(), lr=float(args.lr))
 
     num_trial = 0
-    train_iter = patience = total_loss = report_loss = total_words = report_words = 0
+    train_iter = train_actual_iter = patience = total_loss = report_loss = batch_words = total_words = report_words = 0
     total_examples = report_examples = epoch = valid_num = 0
     train_time = begin_time = time.time()
 
@@ -157,9 +157,11 @@ def main():
 
     # Train
     log.info('Training...')
+    optimizer.zero_grad()
+    batch_loss = torch.zeros(1, dtype=torch.float, device=device)
     epoch = step // len(train_dataset)
     while epoch != args.num_epochs:
-        epoch += 1
+        epoch += 1        
         log.info(f'Starting epoch {epoch}...')
         with torch.enable_grad(), \
                 tqdm(total=len(train_loader.dataset)) as progress_bar:
@@ -179,8 +181,6 @@ def main():
                 copy_idxs[:,-1] = EOS
                 tgt_idxs = copy_idxs[:, :-1]
                 tgt_idxs_y = copy_idxs[:, 1:]
-
-                optimizer.zero_grad()
                 
                 src_mask = src_idxs != PAD
                 tgt_mask = tgt_idxs != PAD
@@ -221,24 +221,29 @@ def main():
                 tgt_no_pad = tgt_idxs_y != PAD
                 tgt_len = tgt_no_pad.sum(-1)
 
-                batch_words = torch.sum(tgt_len).item()
+                batch_words += torch.sum(tgt_len).item()
                 report_words += batch_words
                 total_words += batch_words
                 report_examples += batch_size
                 total_examples += batch_size
 
-
-                batch_loss = F.nll_loss(log_p, tgt_idxs_y, ignore_index=0, reduction='sum')
-                loss = batch_loss / batch_words
+                batch_loss += F.nll_loss(log_p, tgt_idxs_y, ignore_index=0, reduction='sum')
+                
 
                 # Backward
-                loss.backward()
-                nn.utils.clip_grad_norm_(model.parameters(), args.max_grad_norm)
-                optimizer.step()
+                if train_iter % 4 == 0 or batch_size < args.batch_size:
+                    loss = batch_loss / batch_words
+                    loss.backward()                    
+                    nn.utils.clip_grad_norm_(model.parameters(), args.max_grad_norm)
+                    optimizer.step()
 
-                batch_loss_val = batch_loss.item()
-                report_loss += batch_loss_val
-                total_loss += batch_loss_val
+                    batch_loss_val = batch_loss.item()
+                    report_loss += batch_loss_val
+                    total_loss += batch_loss_val
+                    optimizer.zero_grad()
+                    batch_words = 0
+                    batch_loss = torch.zeros(1, dtype=torch.float, device=device)
+                    train_actual_iter += 1
 
                 # Log info
                 step += batch_size
@@ -246,7 +251,7 @@ def main():
                 progress_bar.set_postfix(epoch=epoch,
                                          NLL=batch_loss_val)
                 
-                if train_iter % args.log_every == 0:
+                if train_actual_iter % args.log_every == 0:
                     '''
                     log.info('epoch %d, iter %d, avg. loss %.2f, avg. ppl %.2f ' \
                       'cum. examples %d, speed %.2f words/sec, time elapsed %.2f sec' % (epoch, train_iter,
@@ -289,7 +294,7 @@ def main():
                 
 
                 # perform validation
-                if train_iter % args.valid_niter == 0:
+                if train_actual_iter % args.valid_niter == 0:
                     log.info('epoch %d, iter %d, totat loss %.2f, total ppl %.2f total examples %d' % (epoch, train_iter,
                                                                                             total_loss / total_examples,
                                                                                             np.exp(total_loss / total_words),
