@@ -250,6 +250,7 @@ def main():
                     total_words += batch_words
                     report_examples += batch_size_actual
                     total_examples += batch_size_actual
+                    print(f"batch_size_actual: {batch_size_actual}")    
 
                     batch_words = 0
                     batch_loss = 0
@@ -298,57 +299,57 @@ def main():
                         #util.evaluateRandomly(model, word2Idx, Idx2Word, re_cw_idxs[batch_size-1].unsqueeze(0), device)
                 
 
-                # perform validation
-                if args.valid_niter > 0 and train_iter_actual % args.valid_niter == 0:
-                    log.info('epoch %d, iter %d, totat loss %.2f, total ppl %.2f total examples %d' % (epoch, train_iter,
-                                                                                            total_loss / total_examples,
-                                                                                            np.exp(total_loss / total_words),
-                                                                                            total_examples))
+                    # perform validation
+                    if args.valid_niter > 0 and train_iter_actual % args.valid_niter == 0:
+                        log.info('epoch %d, iter %d, totat loss %.2f, total ppl %.2f total examples %d' % (epoch, train_iter,
+                                                                                                total_loss / total_examples,
+                                                                                                np.exp(total_loss / total_words),
+                                                                                                total_examples))
 
-                    total_loss = total_examples = total_words = 0.
-                    valid_num += 1
+                        total_loss = total_examples = total_words = 0.
+                        valid_num += 1
 
-                    print('begin validation ...', file=sys.stderr)
+                        print('begin validation ...', file=sys.stderr)
 
-                    # compute dev metrics
-                    results = evaluate(model, dev_loader, device, args.use_squad_v2)
+                        # compute dev metrics
+                        results = evaluate(model, dev_loader, device, args.use_squad_v2)
 
-                    log.info('validation: iter %d, dev. ppl %f' % (train_iter, results[args.metric_name]))
+                        log.info('validation: iter %d, dev. ppl %f' % (train_iter, results[args.metric_name]))
 
-                    if saver.is_best(results[args.metric_name]):
-                        patience = 0
-                        log.info('save currently the best model to [%s]' % model_save_path)
-                        saver.save(step, model, results[args.metric_name], device)
-
-                        # also save the optimizers' state
-                        torch.save(optimizer.state_dict(), model_save_path + '.optim')
-                    
-                    elif patience < args.patience_limit:
-                        patience += 1
-                        log.info('hit patience %d' % patience)
-
-                        if patience == args.patience_limit:
-                            num_trial += 1
-                            log.info('hit #%d trial' % num_trial)
-                            if num_trial == args.max_num_trials:
-                                log.info('early stop!')
-                                exit(0)
-
-                            # decay lr, and restore from previously best checkpoint
-                            lr = optimizer.param_groups[0]['lr'] * args.lr_decay
-                            log.info('load previously best model and decay learning rate to %f' % lr)
-
-                            model, step = util.load_model(model, model_save_path, args.gpu_ids)
-
-                            log.info('restore parameters of the optimizers')
-                            optimizer.load_state_dict(torch.load(model_save_path + '.optim'))
-
-                            # set new lr
-                            for param_group in optimizer.param_groups:
-                                param_group['lr'] = lr
-
-                            # reset patience
+                        if saver.is_best(results[args.metric_name]):
                             patience = 0
+                            log.info('save currently the best model to [%s]' % model_save_path)
+                            saver.save(step, model, results[args.metric_name], device)
+
+                            # also save the optimizers' state
+                            torch.save(optimizer.state_dict(), model_save_path + '.optim')
+                        
+                        elif patience < args.patience_limit:
+                            patience += 1
+                            log.info('hit patience %d' % patience)
+
+                            if patience == args.patience_limit:
+                                num_trial += 1
+                                log.info('hit #%d trial' % num_trial)
+                                if num_trial == args.max_num_trials:
+                                    log.info('early stop!')
+                                    exit(0)
+
+                                # decay lr, and restore from previously best checkpoint
+                                lr = optimizer.param_groups[0]['lr'] * args.lr_decay
+                                log.info('load previously best model and decay learning rate to %f' % lr)
+
+                                model, step = util.load_model(model, model_save_path, args.gpu_ids)
+
+                                log.info('restore parameters of the optimizers')
+                                optimizer.load_state_dict(torch.load(model_save_path + '.optim'))
+
+                                # set new lr
+                                for param_group in optimizer.param_groups:
+                                    param_group['lr'] = lr
+
+                                # reset patience
+                                patience = 0
 
                 if epoch == args.num_epochs:
                     log.info('reached maximum number of epochs!')
