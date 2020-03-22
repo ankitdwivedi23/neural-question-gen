@@ -176,14 +176,13 @@ def main():
                 batch_size_actual += minibatch_size
 
                 # Setup for forward
-                src_idxs = cw_idxs[:,:10]
+                src_idxs = cw_idxs[:,:100]
                 #src_idxs = cw_idxs
-                copy_idxs = torch.cat((torch.zeros((minibatch_size, 1), device=device, dtype=torch.long), src_idxs, torch.zeros((minibatch_size, 1), device=device, dtype=torch.long)), dim=-1)
-                copy_idxs[:,0] = SOS
-                copy_idxs[:,-1] = EOS
-                tgt_idxs = copy_idxs[:, :-1]
-                tgt_idxs_y = copy_idxs[:, 1:]
-                src_idxs = torch.flip(src_idxs, [1])
+                #copy_idxs = torch.cat((torch.zeros((minibatch_size, 1), device=device, dtype=torch.long), src_idxs, torch.zeros((minibatch_size, 1), device=device, dtype=torch.long)), dim=-1)
+                #copy_idxs[:,0] = SOS
+                #copy_idxs[:,-1] = EOS
+                tgt_idxs = qw_idxs[:, :-1]
+                tgt_idxs_y = qw_idxs[:, 1:]
                 
                 src_mask = src_idxs != PAD
                 tgt_mask = tgt_idxs != PAD
@@ -386,12 +385,11 @@ def evaluate(model, data_loader, device, use_squad_v2):
             # Setup for forward
             src_idxs = cw_idxs[:,:10]
             #src_idxs = cw_idxs
-            copy_idxs = torch.cat((torch.zeros((batch_size, 1), device=device, dtype=torch.long), src_idxs, torch.zeros((batch_size, 1), device=device, dtype=torch.long)), dim=-1)
-            copy_idxs[:,0] = SOS
-            copy_idxs[:,-1] = EOS
-            tgt_idxs = copy_idxs[:, :-1]
-            tgt_idxs_y = copy_idxs[:, 1:]
-            src_idxs = torch.flip(src_idxs, [1])
+            #copy_idxs = torch.cat((torch.zeros((batch_size, 1), device=device, dtype=torch.long), src_idxs, torch.zeros((batch_size, 1), device=device, dtype=torch.long)), dim=-1)
+            #copy_idxs[:,0] = SOS
+            #copy_idxs[:,-1] = EOS
+            tgt_idxs = qw_idxs[:, :-1]
+            tgt_idxs_y = qw_idxs[:, 1:]
             
             src_mask = src_idxs != PAD
             tgt_mask = tgt_idxs != PAD
