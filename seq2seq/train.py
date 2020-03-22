@@ -136,7 +136,7 @@ def main():
     optimizer = torch.optim.Adam(model.parameters(), lr=float(args.lr))
 
     num_trial = 0
-    train_iter = train_iter_actual = batch_size_actual = patience = total_loss = report_loss = batch_words = total_words = report_words = 0
+    train_iter = train_iter_actual = batch_size_actual = batch_loss = patience = total_loss = report_loss = batch_words = total_words = report_words = 0
     total_examples = report_examples = epoch = valid_num = 0
     train_time = begin_time = time.time()
 
@@ -158,7 +158,6 @@ def main():
     # Train
     log.info('Training...')
     optimizer.zero_grad()
-    batch_loss = torch.zeros(1, dtype=torch.float, device=device)
     epoch = step // len(train_dataset)
     while epoch != args.num_epochs:
         epoch += 1        
@@ -222,36 +221,38 @@ def main():
                 tgt_no_pad = tgt_idxs_y != PAD
                 tgt_len = tgt_no_pad.sum(-1)
 
-                batch_words += torch.sum(tgt_len).item()
+                minibatch_words = torch.sum(tgt_len).item()
+                batch_words += minibatch_words
                 report_words += batch_words
                 total_words += batch_words
                 report_examples += batch_size
                 total_examples += batch_size
 
-                batch_loss += F.nll_loss(log_p, tgt_idxs_y, ignore_index=0, reduction='sum')
-                
+                minibatch_loss = F.nll_loss(log_p, tgt_idxs_y, ignore_index=0, reduction='sum')
+                loss = minibatch_loss / minibatch_words
+                loss.backward()
+
+                batch_loss += minibatch_loss.item()          
 
                 # Backward
-                if train_iter % 4 == 0 or batch_size < args.batch_size:
-                    loss = batch_loss / batch_words
-                    loss.backward()                    
+                if train_iter % 4 == 0 or batch_size < args.batch_size:                                        
                     nn.utils.clip_grad_norm_(model.parameters(), args.max_grad_norm)
                     optimizer.step()
 
-                    batch_loss_val = batch_loss.item()
-                    report_loss += batch_loss_val
-                    total_loss += batch_loss_val
-                    optimizer.zero_grad()
-                    batch_words = 0
-                    batch_loss = torch.zeros(1, dtype=torch.float, device=device)
-                    train_iter_actual += 1
+                    report_loss += batch_loss
+                    total_loss += batch_loss
+                    optimizer.zero_grad()                    
 
                     # Log info
-                    step += batch_size
+                    step += batch_size_actual
                     progress_bar.update(batch_size_actual)
                     progress_bar.set_postfix(epoch=epoch,
-                                            NLL=batch_loss_val)
+                                            NLL=batch_loss)
+                    
+                    batch_words = 0
+                    batch_loss = 0
                     batch_size_actual = 0
+                    train_iter_actual += 1
                 
                 if train_iter_actual % args.log_every == 0:
                     '''
