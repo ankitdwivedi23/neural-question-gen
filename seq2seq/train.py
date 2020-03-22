@@ -380,7 +380,7 @@ def evaluate(model, data_loader, device, use_squad_v2):
             batch_size = cw_idxs.size(0)
             
             # Setup for forward
-            src_idxs = cw_idxs[:,:100]
+            src_idxs = cw_idxs[:,:10]
             #src_idxs = cw_idxs
             copy_idxs = torch.cat((torch.zeros((batch_size, 1), device=device, dtype=torch.long), src_idxs, torch.zeros((batch_size, 1), device=device, dtype=torch.long)), dim=-1)
             copy_idxs[:,0] = SOS
