@@ -250,7 +250,6 @@ def main():
                     total_words += batch_words
                     report_examples += batch_size_actual
                     total_examples += batch_size_actual
-                    print(f"batch_size_actual: {batch_size_actual}")    
 
                     batch_words = 0
                     batch_loss = 0
