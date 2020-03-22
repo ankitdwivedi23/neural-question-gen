@@ -256,46 +256,46 @@ def main():
                     batch_size_actual = 0
                     train_iter_actual += 1
                 
-                if train_iter_actual % args.log_every == 0:
-                    '''
-                    log.info('epoch %d, iter %d, avg. loss %.2f, avg. ppl %.2f ' \
-                      'cum. examples %d, speed %.2f words/sec, time elapsed %.2f sec' % (epoch, train_iter,
-                                                                                         report_loss / report_examples,
-                                                                                         math.exp(report_loss / report_tgt_words),
-                                                                                         cum_examples,
-                                                                                         report_tgt_words / (time.time() - train_time),
-                                                                                         time.time() - begin_time))
-                    '''
-                    '''
+                    if train_iter_actual % args.log_every == 0:
+                        '''
+                        log.info('epoch %d, iter %d, avg. loss %.2f, avg. ppl %.2f ' \
+                        'cum. examples %d, speed %.2f words/sec, time elapsed %.2f sec' % (epoch, train_iter,
+                                                                                            report_loss / report_examples,
+                                                                                            math.exp(report_loss / report_tgt_words),
+                                                                                            cum_examples,
+                                                                                            report_tgt_words / (time.time() - train_time),
+                                                                                            time.time() - begin_time))
+                        '''
+                        '''
 
-                    print("Context Words:")
-                    print(getWords(src_idxs[0].squeeze().tolist()))                    
-                    
-                    print("Question Words:")
-                    print(getWords(tgt_idxs[0].squeeze().tolist()))
+                        print("Context Words:")
+                        print(getWords(src_idxs[0].squeeze().tolist()))                    
+                        
+                        print("Question Words:")
+                        print(getWords(tgt_idxs[0].squeeze().tolist()))
 
-                    print("Predicted Words:")
-                    model.eval()
-                    predicted_idxs = util.greedyDecode(model, word2Idx, Idx2Word, src_idxs[0].unsqueeze(0), device)
-                    print(predicted_idxs)
-                    print(getWords(predicted_idxs))
-                    model.train()
-                    '''
-                    
-                    log.info('epoch %d, iter %d, avg. loss %.2f, avg. ppl %.2f ' \
-                      'cum. examples %d, speed %.2f words/sec, time elapsed %.2f sec' % (epoch, train_iter,
-                                                                                         report_loss / report_words,
-                                                                                         math.exp(report_loss / report_words),
-                                                                                         total_examples,
-                                                                                         report_words / (time.time() - train_time),
-                                                                                         time.time() - begin_time))
+                        print("Predicted Words:")
+                        model.eval()
+                        predicted_idxs = util.greedyDecode(model, word2Idx, Idx2Word, src_idxs[0].unsqueeze(0), device)
+                        print(predicted_idxs)
+                        print(getWords(predicted_idxs))
+                        model.train()
+                        '''
+                        
+                        log.info('epoch %d, iter %d, avg. loss %.2f, avg. ppl %.2f ' \
+                        'cum. examples %d, speed %.2f words/sec, time elapsed %.2f sec' % (epoch, train_iter,
+                                                                                            report_loss / report_words,
+                                                                                            math.exp(report_loss / report_words),
+                                                                                            total_examples,
+                                                                                            report_words / (time.time() - train_time),
+                                                                                            time.time() - begin_time))
 
-                    train_time = time.time()
-                    report_loss = report_words = report_examples = 0.
+                        train_time = time.time()
+                        report_loss = report_words = report_examples = 0.
 
-                    #print(getWords(re_cw_idxs[batch_size-1].squeeze().tolist()))
-                    #print(getWords(qw_idxs[batch_size-1].squeeze().tolist()))
-                    #util.evaluateRandomly(model, word2Idx, Idx2Word, re_cw_idxs[batch_size-1].unsqueeze(0), device)
+                        #print(getWords(re_cw_idxs[batch_size-1].squeeze().tolist()))
+                        #print(getWords(qw_idxs[batch_size-1].squeeze().tolist()))
+                        #util.evaluateRandomly(model, word2Idx, Idx2Word, re_cw_idxs[batch_size-1].unsqueeze(0), device)
                 
 
                 # perform validation
