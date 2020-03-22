@@ -223,11 +223,7 @@ def main():
 
                 minibatch_words = torch.sum(tgt_len).item()
                 batch_words += minibatch_words
-                report_words += batch_words
-                total_words += batch_words
-                report_examples += batch_size
-                total_examples += batch_size
-
+                
                 minibatch_loss = F.nll_loss(log_p, tgt_idxs_y, ignore_index=0, reduction='sum')
                 loss = minibatch_loss / minibatch_words
                 loss.backward()
@@ -249,6 +245,12 @@ def main():
                     progress_bar.set_postfix(epoch=epoch,
                                             NLL=batch_loss)
                     
+                    
+                    report_words += batch_words
+                    total_words += batch_words
+                    report_examples += batch_size_actual
+                    total_examples += batch_size_actual
+
                     batch_words = 0
                     batch_loss = 0
                     batch_size_actual = 0
