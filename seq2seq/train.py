@@ -174,7 +174,7 @@ def main():
                 batch_size_actual += batch_size
 
                 # Setup for forward
-                src_idxs = cw_idxs[:,:100]
+                src_idxs = cw_idxs[:,:10]
                 #src_idxs = cw_idxs
                 copy_idxs = torch.cat((torch.zeros((batch_size, 1), device=device, dtype=torch.long), src_idxs, torch.zeros((batch_size, 1), device=device, dtype=torch.long)), dim=-1)
                 copy_idxs[:,0] = SOS
