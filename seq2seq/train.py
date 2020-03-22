@@ -173,7 +173,7 @@ def main():
                 cw_idxs = cw_idxs.to(device)
                 qw_idxs = qw_idxs.to(device)
                 minibatch_size = cw_idxs.size(0)
-                batch_size_actual += batch_size
+                batch_size_actual += minibatch_size
 
                 # Setup for forward
                 src_idxs = cw_idxs[:,:10]
