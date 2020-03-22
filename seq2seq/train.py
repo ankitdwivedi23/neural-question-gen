@@ -136,7 +136,7 @@ def main():
     optimizer = torch.optim.Adam(model.parameters(), lr=float(args.lr))
 
     num_trial = 0
-    train_iter = train_actual_iter = patience = total_loss = report_loss = batch_words = total_words = report_words = 0
+    train_iter = train_iter_actual = batch_size_actual = patience = total_loss = report_loss = batch_words = total_words = report_words = 0
     total_examples = report_examples = epoch = valid_num = 0
     train_time = begin_time = time.time()
 
@@ -172,6 +172,7 @@ def main():
                 cw_idxs = cw_idxs.to(device)
                 qw_idxs = qw_idxs.to(device)
                 batch_size = cw_idxs.size(0)
+                batch_size_actual += batch_size
 
                 # Setup for forward
                 src_idxs = cw_idxs[:,:100]
@@ -243,15 +244,16 @@ def main():
                     optimizer.zero_grad()
                     batch_words = 0
                     batch_loss = torch.zeros(1, dtype=torch.float, device=device)
-                    train_actual_iter += 1
+                    train_iter_actual += 1
 
-                # Log info
-                step += batch_size
-                progress_bar.update(batch_size)
-                progress_bar.set_postfix(epoch=epoch,
-                                         NLL=batch_loss_val)
+                    # Log info
+                    step += batch_size
+                    progress_bar.update(batch_size_actual)
+                    progress_bar.set_postfix(epoch=epoch,
+                                            NLL=batch_loss_val)
+                    batch_size_actual = 0
                 
-                if train_actual_iter % args.log_every == 0:
+                if train_iter_actual % args.log_every == 0:
                     '''
                     log.info('epoch %d, iter %d, avg. loss %.2f, avg. ppl %.2f ' \
                       'cum. examples %d, speed %.2f words/sec, time elapsed %.2f sec' % (epoch, train_iter,
@@ -294,7 +296,7 @@ def main():
                 
 
                 # perform validation
-                if train_actual_iter % args.valid_niter == 0:
+                if train_iter_actual % args.valid_niter == 0:
                     log.info('epoch %d, iter %d, totat loss %.2f, total ppl %.2f total examples %d' % (epoch, train_iter,
                                                                                             total_loss / total_examples,
                                                                                             np.exp(total_loss / total_words),
