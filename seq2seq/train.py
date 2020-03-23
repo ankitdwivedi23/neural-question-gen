@@ -58,8 +58,8 @@ log.info('Loading word2Idx...')
 word2Idx = json.loads(open(args.word2idx_file).read())
 Idx2Word = {v: k for (k,v) in word2Idx.items()}
 
-#vocab_size = len(word2Idx)
-vocab_size = word_vectors.size(0)
+vocab_size = len(word2Idx)
+#vocab_size = word_vectors.size(0)
 print(f"Vocab size: {vocab_size}")
 
 

@@ -155,7 +155,7 @@ class Seq2Seq(nn.Module):
 
         self.hidden_size = hidden_size
         self.device = device
-        self.word_vectors = word_vectors
+        #self.word_vectors = word_vectors
         self.model_type = 'seq2seq'
 
         self.emb = nn.Embedding(num_embeddings=output_size, embedding_dim=hidden_size)
@@ -240,7 +240,7 @@ class Seq2SeqAttn(nn.Module):
         super(Seq2SeqAttn, self).__init__()
 
         self.hidden_size = hidden_size
-        self.word_vectors = word_vectors
+        #self.word_vectors = word_vectors
         self.device = device
         self.enc_hiddens = None
         self.enc_masks = None
