@@ -155,12 +155,12 @@ class Seq2Seq(nn.Module):
 
         self.hidden_size = hidden_size
         self.device = device
-        #self.word_vectors = word_vectors
+        self.word_vectors = word_vectors
         self.model_type = 'seq2seq'
 
-        self.emb = nn.Embedding(num_embeddings=output_size, embedding_dim=hidden_size)
-        self.dropout = nn.Dropout(p=drop_prob)
-        #self.emb = layers.Embedding(word_vectors, hidden_size, drop_prob=drop_prob)
+        #self.emb = nn.Embedding(num_embeddings=output_size, embedding_dim=hidden_size)
+        #self.dropout = nn.Dropout(p=drop_prob)
+        self.emb = layers.Embedding(word_vectors, hidden_size, drop_prob=drop_prob)
         
         self.encoder = layers.EncoderRNN(input_size=hidden_size,
                                      hidden_size=hidden_size,
@@ -205,7 +205,7 @@ class Seq2Seq(nn.Module):
         dec_state  = dec_init_state        #(num_layers, batch_size, hidden_size)
 
         q_emb = self.emb(qw_idxs)         # (batch_size, q_len, hidden_size)
-        q_emb = self.dropout(q_emb)
+        #q_emb = self.dropout(q_emb)
 
         # Initialize a list we will use to collect the combined decoder output o_t on each step
         combined_decoder_outputs = []
@@ -240,14 +240,14 @@ class Seq2SeqAttn(nn.Module):
         super(Seq2SeqAttn, self).__init__()
 
         self.hidden_size = hidden_size
-        #self.word_vectors = word_vectors
+        self.word_vectors = word_vectors
         self.device = device
         self.enc_hiddens = None
         self.enc_masks = None
         self.model_type = 'seq2seq_attn'
         
-        self.emb = nn.Embedding(num_embeddings=output_size, embedding_dim=hidden_size)
-        #self.emb = layers.Embedding(word_vectors, hidden_size)
+        #self.emb = nn.Embedding(num_embeddings=output_size, embedding_dim=hidden_size)
+        self.emb = layers.Embedding(word_vectors, hidden_size)
 
         self.encoder = layers.EncoderRNN(input_size=hidden_size,
                                      hidden_size=hidden_size,
@@ -304,7 +304,7 @@ class Seq2SeqAttn(nn.Module):
         dec_state = dec_init_state        #(batch_size, hidden_size)
         
         q_emb = self.emb(qw_idxs)         # (batch_size, q_len, hidden_size)
-        q_emb = self.dropout(q_emb)
+        #q_emb = self.dropout(q_emb)
 
         # Initialize a list we will use to collect the combined decoder output o_t on each step
         combined_decoder_outputs = []
