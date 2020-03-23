@@ -191,6 +191,18 @@ def get_test_args():
     parser.add_argument('--word2idx_file',
                         type=str,
                         default='./data/reduced/full/word2idx.json')
+    parser.add_argument('--context_file',
+                        type=str,
+                        default='contexts.txt',
+                        help='Name for contexts file.')
+    parser.add_argument('--question_file',
+                        type=str,
+                        default='questions.txt',
+                        help='Name for questions file.')
+    parser.add_argument('--prediction_file',
+                        type=str,
+                        default='predictions.txt',
+                        help='Name for predictions file.')
 
     # Require load_path for test.py
     args = parser.parse_args()

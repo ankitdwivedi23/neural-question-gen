@@ -21,9 +21,11 @@ from collections import namedtuple
 Hypothesis = namedtuple('Hypothesis', ['value', 'score'])
 from typing import List, Tuple, Dict, Set, Union
 from torchtext.data.metrics import bleu_score
+from nltk.translate.bleu_score import corpus_bleu, sentence_bleu, SmoothingFunction
 
 SOS = "--SOS--"
 EOS = "--EOS--"
+NULL = "--NULL--"
 
 class SQuAD(data.Dataset):
     """Stanford Question Answering Dataset (SQuAD).
@@ -652,34 +654,59 @@ def evaluate(model, word2idx_dict, idx2word_dict, cw_idx, device):
 
     return sent
 
-def evaluate_cqo(model, word2idx_dict, idx2word_dict, cw_idx, qw_idx, device):
-    output_words = evaluate(model, word2idx_dict, idx2word_dict, cw_idx, device)
-    output_sentence = ' '.join(output_words)
-    gold_sentence = ' '.join([idx2word_dict[id] for id in qw_idx.squeeze().tolist()])
+def get_top_hypothesis(model, word2idx_dict, idx2word_dict,
+                      cw_idx, qw_idx, device,
+                      context_file, gold_question_file, prediction_file):
+    #output_words = evaluate(model, word2idx_dict, idx2word_dict, cw_idx, device)
+    #output_sentence = ' '.join(output_words)
+    hypotheses = beam_search(model, cw_idx, word2idx_dict, idx2word_dict, device, beam_size=3, max_decoding_time_step=20)
+    top_hypothesis = hypotheses[0]
+    gold_question = ' '.join([idx2word_dict[id] for id in qw_idx.squeeze().tolist()])
     context = ' '.join([idx2word_dict[id] for id in cw_idx.squeeze().tolist()])
-    return context, gold_sentence, output_sentence
+    
+    context = context.replace(SOS, "").replace(EOS, "").replace(NULL, "")
+    gold_question = gold_question.replace(SOS, "").replace(EOS, "").replace(NULL, "")
+    hyp_question = ' '.join(top_hypothesis.value)
+
+    if os.path.exists(context_file):
+        mode = 'a'
+    else:
+        mode = 'w'
+    
+    with open(context_file, mode, encoding='utf-8') as cf, \
+                open(gold_question_file, mode, encoding='utf-8') as qf, \
+                    open(prediction_file, mode, encoding='utf-8') as pf:
+                        cf.write(context + '\n')
+                        qf.write(gold_question + '\n')
+                        pf.write(hyp_question + '\n')
+    
+    return context, gold_question, top_hypothesis
 
 
-def FindCandidatesAndReferencesForBLEU(model, word2idx_dict, idx2word_dict, cw_idx_list, qw_idx_list, device):
-    dic  = {}
+def find_candidates_and_references_for_bleu(model, word2idx_dict, idx2word_dict,
+                                            cw_idx_list, qw_idx_list, device,
+                                            context_file, gold_question_file, prediction_file):
+    references  = {}
     candidates = {}
     for x,y in list(zip(cw_idx_list, qw_idx_list)):
-        c, q, output = evaluate_cqo(model, word2idx_dict, idx2word_dict, x, y, device)
-        if c in dic.keys():
-            dic[c].append(q.split())
+        c, q, h = get_top_hypothesis(model, word2idx_dict, idx2word_dict,
+                                     x, y, device, context_file,
+                                     gold_question_file, prediction_file)
+        if c in references.keys():
+            references[c].append(q.split())
         else:
-            dic[c] = [q.split()]
-        candidates[c] = output.split()
-    return list(candidates.values()), list(dic.values())
+            references[c] = [q.split()]
+        candidates[c] = h.value
+    return list(candidates.values()), list(references.values())
 
-# Estimate BLEU for set
 
-def estimateBLEU(model, set_name, word2idx_dict, idx2word_dict, cw_idx_list, qw_idx_list, device):
-    for i in range(1,5):
-        candidate_corpus, references_corpus = FindCandidatesAndReferencesForBLEU(model, word2idx_dict, idx2word_dict, cw_idx_list, qw_idx_list, device)
-        bleu_test = bleu_score(candidate_corpus, references_corpus, max_n=i, weights=[1./i]*i)
-        print("BLEU-" + str(i) + " on " + set_name + " :" + str(bleu_test))
-    return
+def compute_corpus_level_bleu_score(model, set_name, candidates_corpus, references_corpus, device):
+    for i in range(1,5):        
+        bleu_torch = bleu_score(candidates_corpus, references_corpus, max_n=i, weights=[1./i]*i)
+        print("BLEU-" + str(i) + " on " + set_name + " using torchtext :" + str(bleu_torch))
+        bleu_nltk = corpus_bleu(references_corpus, candidates_corpus, weights=[1./i]*i)
+        print("BLEU-" + str(i) + " on " + set_name + " using nltk :" + str(bleu_nltk))
+
 
 def beam_search(model, cw_idx, word2idx_dict, idx2word_dict, device, beam_size: int=5, max_decoding_time_step: int=70) -> List[Hypothesis]:
         
@@ -710,6 +737,10 @@ def beam_search(model, cw_idx, word2idx_dict, idx2word_dict, device, beam_size: 
             #                                                               src_encodings_att_linear.size(2))
 
             y_tm1 = torch.tensor([[word2idx_dict[hyp[-1]]] for hyp in hypotheses], dtype=torch.long, device=device)
+            #print("h_tm1")
+            #print(h_tm1[0].shape)
+            #print("y_tm1")
+            #print(y_tm1.shape)
 
             #x = torch.cat([y_t_embed, att_tm1], dim=-1)
 
@@ -717,12 +748,16 @@ def beam_search(model, cw_idx, word2idx_dict, idx2word_dict, device, beam_size: 
             #                                          exp_src_encodings, exp_src_encodings_att_linear, enc_masks=None)
 
             (h_t, cell_t), log_p_t = model.module.decode(h_tm1, y_tm1)
+            h_t = h_t.transpose(0,1)
+            cell_t = cell_t.transpose(0,1)
+            #print("h_t")
+            #print(h_t.shape)
 
             # log probabilities over target words
             #log_p_t = F.log_softmax(self.target_vocab_projection(att_t), dim=-1)
 
             live_hyp_num = beam_size - len(completed_hypotheses)
-            contiuating_hyp_scores = (hyp_scores.unsqueeze(1).expand_as(log_p_t) + log_p_t).view(-1)
+            contiuating_hyp_scores = (hyp_scores.unsqueeze(1).unsqueeze(2).expand_as(log_p_t) + log_p_t).view(-1)
             top_cand_hyp_scores, top_cand_hyp_pos = torch.topk(contiuating_hyp_scores, k=live_hyp_num)
 
             prev_hyp_ids = top_cand_hyp_pos / vocab_size
@@ -751,7 +786,12 @@ def beam_search(model, cw_idx, word2idx_dict, idx2word_dict, device, beam_size: 
                 break
 
             live_hyp_ids = torch.tensor(live_hyp_ids, dtype=torch.long, device=device)
-            h_tm1 = (h_t[live_hyp_ids], cell_t[live_hyp_ids])
+            #print("live_hyp_ids")
+            #print(live_hyp_ids.shape)
+            h_t, cell_t = (h_t[live_hyp_ids], cell_t[live_hyp_ids])
+            h_t = h_t.transpose(0,1)
+            cell_t = cell_t.transpose(0,1)
+            h_tm1 = (h_t, cell_t)
             #att_tm1 = att_t[live_hyp_ids]
 
             hypotheses = new_hypotheses
