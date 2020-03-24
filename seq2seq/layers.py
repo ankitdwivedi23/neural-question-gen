@@ -23,7 +23,7 @@ class Embedding(nn.Module):
         hidden_size (int): Size of hidden activations.
         drop_prob (float): Probability of zero-ing out activations
     """
-    def __init__(self, word_vectors, hidden_size, drop_prob):
+    def __init__(self, word_vectors, hidden_size, drop_prob=0.):
         super(Embedding, self).__init__()
         self.drop_prob = drop_prob
         self.embed = nn.Embedding.from_pretrained(word_vectors)
@@ -32,8 +32,8 @@ class Embedding(nn.Module):
 
     def forward(self, x):
         emb = self.embed(x)   # (batch_size, seq_len, embed_size)
-        emb = F.dropout(emb, self.drop_prob, self.training)
-        #emb = self.proj(emb)  # (batch_size, seq_len, hidden_size)
+        #emb = F.dropout(emb, self.drop_prob, self.training)
+        emb = self.proj(emb)  # (batch_size, seq_len, hidden_size)
         #emb = self.hwy(emb)   # (batch_size, seq_len, hidden_size)
 
         return emb
@@ -83,7 +83,7 @@ class EncoderRNN(nn.Module):
     def __init__(self,
                  input_size,
                  hidden_size,
-                 num_layers,
+                 num_layers=1,
                  drop_prob=0.):
         super(EncoderRNN, self).__init__()
         self.drop_prob = drop_prob
@@ -102,9 +102,17 @@ class EncoderRNN(nn.Module):
         batch_size = x.size(0)
 
         # Sort by length and pack sequence for RNN
-        lengths, sort_idx = lengths.sort(0, descending=True)
-        x = x[sort_idx]     # (batch_size, seq_len, input_size)
-        x = pack_padded_sequence(x, lengths, batch_first=True)
+        #print("Before sorting:")
+        #print(x)
+        #lengths, sort_idx = lengths.sort(0, descending=True)
+        #print("Lengths shape:")
+        #print(lengths.shape)
+        #x = x[sort_idx]     # (batch_size, seq_len, input_size)
+        #print("Sorted:")
+        #print(x)
+        x = pack_padded_sequence(x, lengths, batch_first=True, enforce_sorted=False)
+        #print("Packed Sequence")
+        #print(x)
 
         # Flatten RNN params
         self.rnn.flatten_parameters()
@@ -114,8 +122,8 @@ class EncoderRNN(nn.Module):
 
         # Unpack and reverse sort
         x, _ = pad_packed_sequence(x, batch_first=True, total_length=orig_len)
-        _, unsort_idx = sort_idx.sort(0)
-        x = x[unsort_idx]   # (batch_size, seq_len, 2 * hidden_size)
+        #_, unsort_idx = sort_idx.sort(0)
+        #x = x[unsort_idx]   # (batch_size, seq_len, 2 * hidden_size)
 
         # Apply dropout (RNN applies dropout after all but the last layer)
         #enc_hiddens = F.dropout(x, self.drop_prob, self.training)
@@ -130,6 +138,7 @@ class EncoderRNN(nn.Module):
         dec_init_hidden = self.h_projection(last_hidden)
         dec_init_cell = self.c_projection(last_cell)
         dec_init_state = (dec_init_hidden, dec_init_cell)
+        #dec_init_state = (last_hidden, last_cell)
 
         return x, dec_init_state
 
@@ -140,12 +149,12 @@ class DecoderRNN(nn.Module):
         hidden_size (int): Size of the RNN hidden state.
         num_layers (int): Number of layers of RNN cells to use.
     """
-    def __init__(self, input_size, hidden_size, num_layers=1):
+    def __init__(self, input_size, hidden_size, num_layers=1, drop_prob=0.):
         super(DecoderRNN, self).__init__()
         self.input_size = input_size
         self.hidden_size = hidden_size
         self.num_layers = num_layers
-        self.rnn = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True)
+        self.rnn = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True, dropout=drop_prob)
 
     def forward(self, input, hidden):
         self.rnn.flatten_parameters()

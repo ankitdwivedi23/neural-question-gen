@@ -15,31 +15,31 @@ def get_setup_args():
 
     parser.add_argument('--train_url',
                         type=str,
-                        default='https://github.com/chrischute/squad/minisample_66/train-v2.0.json')
+                        default='https://github.com/chrischute/squad/data/train-v2.0.json')
     parser.add_argument('--dev_url',
                         type=str,
-                        default='https://github.com/chrischute/squad/minisample_66/dev-v2.0.json')
+                        default='https://github.com/chrischute/squad/data/dev-v2.0.json')
     parser.add_argument('--test_url',
                         type=str,
-                        default='https://github.com/chrischute/squad/minisample_66/test-v2.0.json')
+                        default='https://github.com/chrischute/squad/data/test-v2.0.json')
     parser.add_argument('--glove_url',
                         type=str,
-                        default='http://nlp.stanford.edu/minisample_66/glove.840B.300d.zip')
+                        default='http://nlp.stanford.edu/data/glove.840B.300d.zip')
     parser.add_argument('--dev_meta_file',
                         type=str,
-                        default='./minisample_66/dev_meta.json')
+                        default='./data/reduced/full/dev_meta.json')
     parser.add_argument('--test_meta_file',
                         type=str,
-                        default='./minisample_66/test_meta.json')
+                        default='./data/reduced/full/test_meta.json')
     parser.add_argument('--word2idx_file',
                         type=str,
-                        default='./minisample_66/word2idx.json')
+                        default='./data/reduced/full/word2idx.json')
     parser.add_argument('--char2idx_file',
                         type=str,
-                        default='./minisample_66/char2idx.json')
+                        default='./data/reduced/full/char2idx.json')
     parser.add_argument('--answer_file',
                         type=str,
-                        default='./minisample_66/answer.json')
+                        default='./data/reduced/full/answer.json')
     parser.add_argument('--para_limit',
                         type=int,
                         default=400,
@@ -95,7 +95,7 @@ def get_train_args():
 
     parser.add_argument('--valid_niter',
                         type=int,
-                        default=10,
+                        default=0,
                         help='Number of iterations between successive evaluations.')
     parser.add_argument('--log_every',
                         type=int,
@@ -109,6 +109,10 @@ def get_train_args():
                         type=float,
                         default=0.5,
                         help='Learning rate decay')
+    parser.add_argument('--epoch_start_decay',
+                        type=int,
+                        default=8,
+                        help='Epoch at which to start decaying the learning rate')
     parser.add_argument('--patience_limit',
                         type=int,
                         default=5,
@@ -131,7 +135,7 @@ def get_train_args():
                         help='Probability of zeroing an activation in dropout layers.')
     parser.add_argument('--metric_name',
                         type=str,
-                        default='NLL',
+                        default='PPL',
                         choices=('NLL', 'PPL'),
                         help='Name of dev metric to determine best checkpoint.')
     parser.add_argument('--max_checkpoints',
@@ -152,7 +156,7 @@ def get_train_args():
                         help='Decay rate for exponential moving average of parameters.')
     parser.add_argument('--word2idx_file',
                         type=str,
-                        default='./minisample_66/word2idx.json')
+                        default='./data/reduced/full/word2idx.json')
 
     args = parser.parse_args()
 
@@ -186,7 +190,19 @@ def get_test_args():
                         help='Name for submission file.')
     parser.add_argument('--word2idx_file',
                         type=str,
-                        default='./minisample_66/word2idx.json')
+                        default='./data/reduced/full/word2idx.json')
+    parser.add_argument('--context_file',
+                        type=str,
+                        default='contexts.txt',
+                        help='Name for contexts file.')
+    parser.add_argument('--question_file',
+                        type=str,
+                        default='questions.txt',
+                        help='Name for questions file.')
+    parser.add_argument('--prediction_file',
+                        type=str,
+                        default='predictions.txt',
+                        help='Name for predictions file.')
 
     # Require load_path for test.py
     args = parser.parse_args()
@@ -200,35 +216,35 @@ def add_common_args(parser):
     """Add arguments common to all 3 scripts: setup.py, train.py, test.py"""
     parser.add_argument('--train_record_file',
                         type=str,
-                        default='./minisample_66/train.npz')
+                        default='./data/reduced/full/train.npz')
     parser.add_argument('--dev_record_file',
                         type=str,
-                        default='./minisample_66/dev.npz')
+                        default='./data/reduced/full/dev.npz')
     parser.add_argument('--test_record_file',
                         type=str,
-                        default='./minisample_66/test.npz')
+                        default='./data/reduced/full/test.npz')
     parser.add_argument('--word_emb_file',
                         type=str,
-                        default='./minisample_66/word_emb.json')
+                        default='./data/reduced/full/word_emb.json')
     parser.add_argument('--char_emb_file',
                         type=str,
-                        default='./minisample_66/char_emb.json')
+                        default='./data/reduced/full/char_emb.json')
     parser.add_argument('--train_eval_file',
                         type=str,
-                        default='./minisample_66/train_eval.json')
+                        default='./data/reduced/full/train_eval.json')
     parser.add_argument('--dev_eval_file',
                         type=str,
-                        default='./minisample_66/dev_eval.json')
+                        default='./data/reduced/full/dev_eval.json')
     parser.add_argument('--test_eval_file',
                         type=str,
-                        default='./minisample_66/test_eval.json')
+                        default='./data/reduced/full/test_eval.json')
 
 
 def add_train_test_args(parser):
     """Add arguments common to train.py and test.py"""
     parser.add_argument('--model_type',
                         type=str,
-                        default='seq2seqGru',
+                        default='seq2seq',
                         help='Model type')
     parser.add_argument('--name',
                         '-n',
@@ -262,8 +278,12 @@ def add_train_test_args(parser):
                         help='Whether to use SQuAD 2.0 (unanswerable) questions.')
     parser.add_argument('--hidden_size',
                         type=int,
-                        default=300,
+                        default=100,
                         help='Number of features in encoder hidden layers.')
+    parser.add_argument('--num_layers',
+                        type=int,
+                        default=1,
+                        help='Number of layers in encoder and decoder.')
     parser.add_argument('--num_visuals',
                         type=int,
                         default=10,

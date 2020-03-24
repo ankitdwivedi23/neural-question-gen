@@ -108,7 +108,7 @@ def process_file(filename, data_type, word_counter, char_counter):
                 for qa in para["qas"]:
                     total += 1
                     ques = qa["question"].replace(
-                        "''", '" ').replace("``", '" ')
+                        "''", '" ').replace("``", '" ').replace("?", "")
                     ques_tokens = word_tokenize(ques)
                     ques_tokens = [SOS] + ques_tokens + [EOS]
                     ques_chars = [list(token) for token in ques_tokens]
@@ -138,8 +138,6 @@ def process_file(filename, data_type, word_counter, char_counter):
                     min_context_index= max(0, min_answer_index - 10)
                     max_context_index = min(len(context_tokens) - 1, max_answer_index + 10)
 
-                    #print(context_tokens[min_context_index:max_context_index+1])
-
                     example = {"context_tokens": context_tokens,
                                "reduced_context_tokens": context_tokens[min_context_index:max_context_index+1],                    
                                "context_chars": context_chars,
@@ -155,12 +153,6 @@ def process_file(filename, data_type, word_counter, char_counter):
                                                  "spans": spans,
                                                  "answers": answer_texts,
                                                  "uuid": qa["id"]}
-                    break
-            if (data_type == 'train' and total >=20) or \
-            (data_type == 'dev' and total >=20) or \
-            (data_type == 'test' and total >=20):
-                break
-
         print(f"{len(examples)} questions in total")
     return examples, eval_examples
 
