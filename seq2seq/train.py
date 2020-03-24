@@ -58,10 +58,8 @@ log.info('Loading word2Idx...')
 word2Idx = json.loads(open(args.word2idx_file).read())
 Idx2Word = {v: k for (k,v) in word2Idx.items()}
 
-vocab_size = len(word2Idx)
-#vocab_size = word_vectors.size(0)
+vocab_size = word_vectors.size(0)
 print(f"Vocab size: {vocab_size}")
-
 
 def getWords(idxList):
         words = []
@@ -84,8 +82,6 @@ def create_new_model():
                     device=device,
                     drop_prob=args.drop_prob,
                     num_layers=args.num_layers)
-        elif args.model_type == "transformer":
-            return TransformerModel(vocab_size, device)
 
 def percentile(t: torch.tensor, q: float) -> Union[int, float]:
     """
@@ -135,7 +131,6 @@ def main():
 
     # Get optimizer and scheduler    
     # Default project starter code uses Adadelta, but we're going to use SGD
-    #optimizer = torch.optim.Adam(model.parameters(), lr=float(args.lr))
     optimizer = torch.optim.SGD(model.parameters(), lr=float(args.lr))
     scheduler = sched.MultiStepLR(optimizer, milestones=[i for i in range(args.epoch_start_decay, args.num_epochs + 1)], gamma=0.5)
 
@@ -182,7 +177,6 @@ def main():
 
                 # Setup for forward
                 src_idxs = re_cw_idxs
-                #src_idxs = cw_idxs
                 #copy_idxs = torch.cat((torch.zeros((minibatch_size, 1), device=device, dtype=torch.long), src_idxs, torch.zeros((minibatch_size, 1), device=device, dtype=torch.long)), dim=-1)
                 #copy_idxs[:,0] = SOS
                 #copy_idxs[:,-1] = EOS
@@ -193,13 +187,9 @@ def main():
                 tgt_mask = tgt_idxs != PAD
 
                 # Forward
+                log_p = model(src_idxs, tgt_idxs)                  #(batch_size, q_len, vocab_size)
 
-                if args.model_type in ['seq2seq', 'seq2seq_attn']:
-                    log_p = model(src_idxs, tgt_idxs)                   #(batch_size, q_len, vocab_size)
-                elif args.model_type == 'transformer':
-                    log_p = model(src_idxs, tgt_idxs, src_mask, tgt_mask)  #(batch_size, q_len, vocab_size)
-                
-                
+                # Print for debugging              
                 '''
                 print("Train Context:")
                 print(src_idxs[0])
@@ -211,20 +201,7 @@ def main():
                 print(log_p[0].argmax(-1))
                 print(getWords(log_p[0].argmax(-1).tolist()))
                 '''
-                          
-                
                 log_p = log_p.contiguous().view(-1, log_p.size(-1))
-
-                #qw_idxs_tgt = qw_idxs[:, 1:]     # omitting leading `SOS`
-                #qw_idxs = qw_idxs.contiguous().view(qw_idxs.size(0) * qw_idxs.size(1))
-                #qw_idxs_tgt = qw_idxs_tgt.contiguous().view(qw_idxs_tgt.size(0) * qw_idxs_tgt.size(1))
-                #q_tgt_mask = torch.zeros_like(qw_idxs_tgt) != qw_idxs_tgt
-                #q_len = q_tgt_mask.sum(-1)
-
-                # Backward
-                #loss.backward()
-                #nn.utils.clip_grad_norm_(model.parameters(), args.max_grad_norm)
-                #optimizer.step()
 
                 tgt_idxs_y = tgt_idxs_y.contiguous().view(-1)
                 tgt_no_pad = tgt_idxs_y != PAD
@@ -266,15 +243,8 @@ def main():
                     train_iter_actual += 1
                 
                     if train_iter_actual % args.log_every == 0:
-                        '''
-                        log.info('epoch %d, iter %d, avg. loss %.2f, avg. ppl %.2f ' \
-                        'cum. examples %d, speed %.2f words/sec, time elapsed %.2f sec' % (epoch, train_iter,
-                                                                                            report_loss / report_examples,
-                                                                                            math.exp(report_loss / report_tgt_words),
-                                                                                            cum_examples,
-                                                                                            report_tgt_words / (time.time() - train_time),
-                                                                                            time.time() - begin_time))
-                        '''
+                        
+                        # Print for debugging
                         '''
 
                         print("Context Words:")
@@ -302,11 +272,6 @@ def main():
                         train_time = time.time()
                         report_loss = report_words = report_examples = 0.
 
-                        #print(getWords(re_cw_idxs[batch_size-1].squeeze().tolist()))
-                        #print(getWords(qw_idxs[batch_size-1].squeeze().tolist()))
-                        #util.evaluateRandomly(model, word2Idx, Idx2Word, re_cw_idxs[batch_size-1].unsqueeze(0), device)
-                
-
                     # perform validation
                     if args.valid_niter > 0 and train_iter_actual % args.valid_niter == 0:
                         log.info('epoch %d, iter %d, totat loss %.2f, total ppl %.2f total examples %d' % (epoch, train_iter_actual,
@@ -324,6 +289,7 @@ def main():
 
                         log.info('validation: iter %d, dev. NLL %f, dev. ppl %f' % (train_iter, results['NLL'], results['PPL']))
 
+                        # code for early stopping, not used in the training of our models
                         '''
                         if saver.is_best(results[args.metric_name]):
                             patience = 0
@@ -394,20 +360,16 @@ def evaluate(model, data_loader, device, use_squad_v2):
             
             # Setup for forward
             src_idxs = re_cw_idxs
-            #src_idxs = cw_idxs
             #copy_idxs = torch.cat((torch.zeros((batch_size, 1), device=device, dtype=torch.long), src_idxs, torch.zeros((batch_size, 1), device=device, dtype=torch.long)), dim=-1)
             #copy_idxs[:,0] = SOS
             #copy_idxs[:,-1] = EOS
             tgt_idxs = qw_idxs[:, :-1]
             tgt_idxs_y = qw_idxs[:, 1:]
-            
-            src_mask = src_idxs != PAD
-            tgt_mask = tgt_idxs != PAD
-
 
             # Forward
             log_p = model(src_idxs, tgt_idxs)        #(batch_size, q_len, vocab_size)
 
+            # Print for debugging            
             print("Validation Context:")
             print(src_idxs[0])
             print(getWords(src_idxs[0].tolist()))

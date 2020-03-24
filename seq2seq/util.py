@@ -560,16 +560,11 @@ def torch_from_json(path, dtype=torch.float32):
     return tensor
 
 
-def TeacherForce(model, word2idx_dict, idx2word_dict, cw_idx, qw_idx, device):
+def teacher_force(model, word2idx_dict, idx2word_dict, cw_idx, qw_idx, device):
     max_len = 2
 
     q = qw_idx.squeeze().tolist()
-
-    if model.module.model_type in ['seq2seq', 'seq2seq_attn']:
-        _, dec_init_state = model.module.encode(cw_idx)
-    elif model.module.model_type == 'transformer':
-        #TODO: add code for transformer
-        pass
+    _, dec_init_state = model.module.encode(cw_idx)
     
     prev_word = SOS
     h_t = dec_init_state
@@ -582,12 +577,8 @@ def TeacherForce(model, word2idx_dict, idx2word_dict, cw_idx, qw_idx, device):
         eos_id = word2idx_dict[EOS] 
         y_tm1 = torch.tensor([[q[t]]], dtype=torch.long, device=device)
 
-        if model.module.model_type in ['seq2seq', 'seq2seq_attn']:
-            h_t, log_p_t  = model.module.decode(h_t, y_tm1)
-        elif model.module.model_type == 'transformer':
-            #TODO: add code for transformer
-            pass
-        
+        h_t, log_p_t  = model.module.decode(h_t, y_tm1)
+                
         prev_word = idx2word_dict[log_p_t.argmax(-1).squeeze().tolist()]
         t = t+1
 
@@ -595,13 +586,8 @@ def TeacherForce(model, word2idx_dict, idx2word_dict, cw_idx, qw_idx, device):
 
 def greedy_decode(model, word2idx_dict, idx2word_dict, cw_idx, device):
     max_len = 10
-
-    if model.module.model_type in ['seq2seq', 'seq2seq_attn']:
-        _, dec_init_state = model.module.encode(cw_idx)
-    elif model.module.model_type == 'transformer':
-        #TODO: add code for transformer
-        pass
-
+    _, dec_init_state = model.module.encode(cw_idx)
+    
     prev_word = SOS
     h_t = dec_init_state
 
@@ -621,17 +607,11 @@ def greedy_decode(model, word2idx_dict, idx2word_dict, cw_idx, device):
         t = t+1
     
     return pred_idxs
-    #print(sent)
 
 def evaluate(model, word2idx_dict, idx2word_dict, cw_idx, device):
     max_len = 30
-
-    if model.module.model_type in ['seq2seq', 'seq2seq_attn']:
-        _, dec_init_state = model.module.encode(cw_idx)
-    elif model.module.model_type == 'transformer':
-        #TODO: add code for transformer
-        pass
-
+     _, dec_init_state = model.module.encode(cw_idx)
+    
     prev_word = SOS
     h_t = dec_init_state
 
@@ -641,14 +621,8 @@ def evaluate(model, word2idx_dict, idx2word_dict, cw_idx, device):
     while prev_word != EOS and t < max_len:
         sent.append(prev_word)
         eos_id = word2idx_dict[EOS] 
-        y_tm1 = torch.tensor([[word2idx_dict[prev_word]]], dtype=torch.long, device=device)
-        
-        if model.module.model_type in ['seq2seq', 'seq2seq_attn']:
-            h_t, log_p_t  = model.module.decode(h_t, y_tm1)
-        elif model.module.model_type == 'transformer':
-            #TODO: add code for transformer
-            pass
-        
+        y_tm1 = torch.tensor([[word2idx_dict[prev_word]]], dtype=torch.long, device=device)        
+        h_t, log_p_t  = model.module.decode(h_t, y_tm1)        
         prev_word = idx2word_dict[log_p_t.argmax(-1).squeeze().tolist()]
         t = t+1
 
@@ -659,7 +633,12 @@ def get_top_hypothesis(model, word2idx_dict, idx2word_dict,
                       context_file, gold_question_file, prediction_file):
     #output_words = evaluate(model, word2idx_dict, idx2word_dict, cw_idx, device)
     #output_sentence = ' '.join(output_words)
-    hypotheses = beam_search(model, cw_idx, word2idx_dict, idx2word_dict, device, beam_size=3, max_decoding_time_step=20)
+    
+    if model.module.model_type == 'seq2seq':
+        hypotheses = beam_search(model, cw_idx, word2idx_dict, idx2word_dict, device, beam_size=3, max_decoding_time_step=20)
+    elif model.module.model_type == 'seq2seq_attn':
+        hypotheses = beam_search_attention(model, cw_idx, word2idx_dict, idx2word_dict, device, beam_size=3, max_decoding_time_step=20)
+
     top_hypothesis = hypotheses[0]
     gold_question = ' '.join([idx2word_dict[id] for id in qw_idx.squeeze().tolist()])
     context = ' '.join([idx2word_dict[id] for id in cw_idx.squeeze().tolist()])
@@ -709,130 +688,11 @@ def compute_corpus_level_bleu_score(model, set_name, candidates_corpus, referenc
 
 
 def beam_search(model, cw_idx, word2idx_dict, idx2word_dict, device, beam_size: int=5, max_decoding_time_step: int=70) -> List[Hypothesis]:
-        
-        src_encodings, dec_init_vec = model.module.encode(cw_idx)
-        #src_encodings_att_linear = self.att_projection(src_encodings)
-
-        h_tm1 = dec_init_vec
-        #att_tm1 = torch.zeros(1, self.hidden_size, device=self.device)
-
-        eos_id = word2idx_dict[EOS]
-        vocab_size = model.module.word_vectors.size(0)
-
-        hypotheses = [[SOS]]
-        hyp_scores = torch.zeros(len(hypotheses), dtype=torch.float, device=device)
-        completed_hypotheses = []
-
-        t = 0
-        while len(completed_hypotheses) < beam_size and t < max_decoding_time_step:
-            t += 1
-            hyp_num = len(hypotheses)
-
-            #exp_src_encodings = src_encodings.expand(hyp_num,
-            #                                         src_encodings.size(1),
-            #                                         src_encodings.size(2))
-
-            #exp_src_encodings_att_linear = src_encodings_att_linear.expand(hyp_num,
-            #                                                               src_encodings_att_linear.size(1),
-            #                                                               src_encodings_att_linear.size(2))
-
-            y_tm1 = torch.tensor([[word2idx_dict[hyp[-1]]] for hyp in hypotheses], dtype=torch.long, device=device)
-            #print("h_tm1")
-            #print(h_tm1[0].shape)
-            #print("y_tm1")
-            #print(y_tm1.shape)
-
-            #x = torch.cat([y_t_embed, att_tm1], dim=-1)
-
-            #(h_t, cell_t), att_t, _  = self.step(x, h_tm1,
-            #                                          exp_src_encodings, exp_src_encodings_att_linear, enc_masks=None)
-
-            (h_t, cell_t), log_p_t = model.module.decode(h_tm1, y_tm1)
-            h_t = h_t.transpose(0,1)
-            cell_t = cell_t.transpose(0,1)
-            #print("h_t")
-            #print(h_t.shape)
-
-            # log probabilities over target words
-            #log_p_t = F.log_softmax(self.target_vocab_projection(att_t), dim=-1)
-
-            live_hyp_num = beam_size - len(completed_hypotheses)
-            contiuating_hyp_scores = (hyp_scores.unsqueeze(1).unsqueeze(2).expand_as(log_p_t) + log_p_t).view(-1)
-            top_cand_hyp_scores, top_cand_hyp_pos = torch.topk(contiuating_hyp_scores, k=live_hyp_num)
-
-            prev_hyp_ids = top_cand_hyp_pos / vocab_size
-            hyp_word_ids = top_cand_hyp_pos % vocab_size
-
-            new_hypotheses = []
-            live_hyp_ids = []
-            new_hyp_scores = []
-
-            for prev_hyp_id, hyp_word_id, cand_new_hyp_score in zip(prev_hyp_ids, hyp_word_ids, top_cand_hyp_scores):
-                prev_hyp_id = prev_hyp_id.item()
-                hyp_word_id = hyp_word_id.item()
-                cand_new_hyp_score = cand_new_hyp_score.item()
-
-                hyp_word = idx2word_dict[hyp_word_id]
-                new_hyp_sent = hypotheses[prev_hyp_id] + [hyp_word]
-                if hyp_word == EOS:
-                    completed_hypotheses.append(Hypothesis(value=new_hyp_sent[1:-1],
-                                                           score=cand_new_hyp_score))
-                else:
-                    new_hypotheses.append(new_hyp_sent)
-                    live_hyp_ids.append(prev_hyp_id)
-                    new_hyp_scores.append(cand_new_hyp_score)
-
-            if len(completed_hypotheses) == beam_size:
-                break
-
-            live_hyp_ids = torch.tensor(live_hyp_ids, dtype=torch.long, device=device)
-            #print("live_hyp_ids")
-            #print(live_hyp_ids.shape)
-            h_t, cell_t = (h_t[live_hyp_ids], cell_t[live_hyp_ids])
-            h_t = h_t.transpose(0,1)
-            cell_t = cell_t.transpose(0,1)
-            h_tm1 = (h_t, cell_t)
-            #att_tm1 = att_t[live_hyp_ids]
-
-            hypotheses = new_hypotheses
-            hyp_scores = torch.tensor(new_hyp_scores, dtype=torch.float, device=device)
-
-        if len(completed_hypotheses) == 0:
-            completed_hypotheses.append(Hypothesis(value=hypotheses[0][1:],
-                                                   score=hyp_scores[0].item()))
-
-        completed_hypotheses.sort(key=lambda hyp: hyp.score, reverse=True)
-
-        return completed_hypotheses
-
-def beamSearch(model, word2idx_dict, idx2word_dict, cw_idx, device, beam_size: int=1, max_decoding_time_step: int=70)-> List[Hypothesis]:
-    """Discretize soft predictions to get question text.
-
-    Args:
-        model: NN Model
-        word2idx_dict: 
-        idx2word_dict:
-        cw_idx (torch.Tensor): context word Index 
-            Shape (1, c_len)
-        device : 
-        beam_size (Int): size of beam
-        max_decoding_time_step (Int): maximum number of time steps to unroll the decoding RNN
-
-    Returns:
-        hypotheses (List[Hypothesis]): a list of hypothesis, each hypothesis has two fields:
-                value: List[str]: the decoded target question, represented as a list of words
-                score: float: the log-likelihood of the target question
-    """
-
-    if model.module.model_type in ['seq2seq', 'seq2seq_attn']:
-         c_enc, dec_init_state = model.module.encode(cw_idx)     # (1, c_len, 2 * hidden_size)
-    elif model.module.model_type == 'transformer':
-        #TODO: add code for transformer
-        pass
-
-    h_tm1 = dec_init_state
-    eos_id = word2idx_dict[EOS] 
-    vocab_size = len(model.module.word_vectors)
+    src_encodings, dec_init_vec = model.module.encode(cw_idx)
+    h_tm1 = dec_init_vec
+    
+    eos_id = word2idx_dict[EOS]
+    vocab_size = model.module.word_vectors.size(0)
 
     hypotheses = [[SOS]]
     hyp_scores = torch.zeros(len(hypotheses), dtype=torch.float, device=device)
@@ -843,20 +703,14 @@ def beamSearch(model, word2idx_dict, idx2word_dict, cw_idx, device, beam_size: i
         t += 1
         hyp_num = len(hypotheses)
 
-        exp_c_enc = c_enc.expand(hyp_num, c_enc.size(1), c_enc.size(2))
-
-        # (batch_size, 1)
         y_tm1 = torch.tensor([[word2idx_dict[hyp[-1]]] for hyp in hypotheses], dtype=torch.long, device=device)
         
-        if model.module.model_type in ['seq2seq', 'seq2seq_attn']:
-            h_t, log_p_t  = model.module.decode(h_tm1, y_tm1)
-            #h_t = h_t[0].permute(1,0,2), h_t[0].permute(1,0,2)  
-        elif model.module.model_type == 'transformer':
-            #TODO: add code for transformer
-            pass
-
+        (h_t, cell_t), log_p_t = model.module.decode(h_tm1, y_tm1)
+        h_t = h_t.transpose(0,1)
+        cell_t = cell_t.transpose(0,1)
+        
         live_hyp_num = beam_size - len(completed_hypotheses)
-        contiuating_hyp_scores = (hyp_scores.unsqueeze(1).unsqueeze(2).expand_as(log_p_t) + log_p_t).contiguous().view(-1)
+        contiuating_hyp_scores = (hyp_scores.unsqueeze(1).unsqueeze(2).expand_as(log_p_t) + log_p_t).view(-1)
         top_cand_hyp_scores, top_cand_hyp_pos = torch.topk(contiuating_hyp_scores, k=live_hyp_num)
 
         prev_hyp_ids = top_cand_hyp_pos / vocab_size
@@ -871,9 +725,9 @@ def beamSearch(model, word2idx_dict, idx2word_dict, cw_idx, device, beam_size: i
             hyp_word_id = hyp_word_id.item()
             cand_new_hyp_score = cand_new_hyp_score.item()
 
-            hyp_word = idx2word_dict[hyp_word_id] 
+            hyp_word = idx2word_dict[hyp_word_id]
             new_hyp_sent = hypotheses[prev_hyp_id] + [hyp_word]
-            if hyp_word_id == eos_id:
+            if hyp_word == EOS:
                 completed_hypotheses.append(Hypothesis(value=new_hyp_sent[1:-1],
                                                         score=cand_new_hyp_score))
             else:
@@ -885,8 +739,12 @@ def beamSearch(model, word2idx_dict, idx2word_dict, cw_idx, device, beam_size: i
             break
 
         live_hyp_ids = torch.tensor(live_hyp_ids, dtype=torch.long, device=device)
-        #h_tm1 = h_t[0][live_hyp_ids].permute(1,0,2), h_t[1][live_hyp_ids].permute(1,0,2)
-        h_tm1 = h_t
+        
+        h_t, cell_t = (h_t[live_hyp_ids], cell_t[live_hyp_ids])
+        h_t = h_t.transpose(0,1)
+        cell_t = cell_t.transpose(0,1)
+        h_tm1 = (h_t, cell_t)
+        
         hypotheses = new_hypotheses
         hyp_scores = torch.tensor(new_hyp_scores, dtype=torch.float, device=device)
 
@@ -895,7 +753,98 @@ def beamSearch(model, word2idx_dict, idx2word_dict, cw_idx, device, beam_size: i
                                                 score=hyp_scores[0].item()))
 
     completed_hypotheses.sort(key=lambda hyp: hyp.score, reverse=True)
-    #print(completed_hypotheses)
+
+    return completed_hypotheses
+
+
+def beam_search_attention(model, cw_idx, word2idx_dict, idx2word_dict, device, beam_size: int=5, max_decoding_time_step: int=70) -> List[Hypothesis]:
+        
+    src_encodings, dec_init_vec = model.module.encode(cw_idx)
+    src_encodings_att_linear = model.module.att_projection(src_encodings)
+
+    h_tm1 = dec_init_vec
+    att_tm1 = torch.zeros(1, model.module.hidden_size, device=device)
+    att_tm1 = att_tm1.unsqueeze(1)
+
+    eos_id = word2idx_dict[EOS]
+    vocab_size = model.module.word_vectors.size(0)
+
+    hypotheses = [[SOS]]
+    hyp_scores = torch.zeros(len(hypotheses), dtype=torch.float, device=device)
+    completed_hypotheses = []
+
+    t = 0
+    while len(completed_hypotheses) < beam_size and t < max_decoding_time_step:
+        t += 1
+        hyp_num = len(hypotheses)
+
+        exp_src_encodings = src_encodings.expand(hyp_num,
+                                                 src_encodings.size(1),
+                                                 src_encodings.size(2))
+
+        exp_src_encodings_att_linear = src_encodings_att_linear.expand(hyp_num,
+                                                                       src_encodings_att_linear.size(1),
+                                                                       src_encodings_att_linear.size(2))
+
+        y_tm1 = torch.tensor([[word2idx_dict[hyp[-1]]] for hyp in hypotheses], dtype=torch.long, device=device)
+        y_t_embed = model.module.emb(y_tm1)
+        
+        x = torch.cat([y_t_embed, att_tm1], dim=-1)
+
+        (h_t, cell_t), att_t, _  = model.module.step(x, h_tm1,
+                                                  exp_src_encodings, exp_src_encodings_att_linear, enc_masks=None)
+
+        h_t = h_t.transpose(0,1)
+        cell_t = cell_t.transpose(0,1)
+        
+        log_p_t = model.module.generator(att_t)
+
+        live_hyp_num = beam_size - len(completed_hypotheses)
+        contiuating_hyp_scores = (hyp_scores.unsqueeze(1).unsqueeze(2).expand_as(log_p_t) + log_p_t).view(-1)
+        top_cand_hyp_scores, top_cand_hyp_pos = torch.topk(contiuating_hyp_scores, k=live_hyp_num)
+
+        prev_hyp_ids = top_cand_hyp_pos / vocab_size
+        hyp_word_ids = top_cand_hyp_pos % vocab_size
+
+        new_hypotheses = []
+        live_hyp_ids = []
+        new_hyp_scores = []
+
+        for prev_hyp_id, hyp_word_id, cand_new_hyp_score in zip(prev_hyp_ids, hyp_word_ids, top_cand_hyp_scores):
+            prev_hyp_id = prev_hyp_id.item()
+            hyp_word_id = hyp_word_id.item()
+            cand_new_hyp_score = cand_new_hyp_score.item()
+
+            hyp_word = idx2word_dict[hyp_word_id]
+            new_hyp_sent = hypotheses[prev_hyp_id] + [hyp_word]
+            if hyp_word == EOS:
+                completed_hypotheses.append(Hypothesis(value=new_hyp_sent[1:-1],
+                                                        score=cand_new_hyp_score))
+            else:
+                new_hypotheses.append(new_hyp_sent)
+                live_hyp_ids.append(prev_hyp_id)
+                new_hyp_scores.append(cand_new_hyp_score)
+
+        if len(completed_hypotheses) == beam_size:
+            break
+
+        live_hyp_ids = torch.tensor(live_hyp_ids, dtype=torch.long, device=device)
+        
+        h_t, cell_t = (h_t[live_hyp_ids], cell_t[live_hyp_ids])
+        h_t = h_t.transpose(0,1)
+        cell_t = cell_t.transpose(0,1)
+        h_tm1 = (h_t, cell_t)
+        att_tm1 = att_t[live_hyp_ids]
+
+        hypotheses = new_hypotheses
+        hyp_scores = torch.tensor(new_hyp_scores, dtype=torch.float, device=device)
+
+    if len(completed_hypotheses) == 0:
+        completed_hypotheses.append(Hypothesis(value=hypotheses[0][1:],
+                                                score=hyp_scores[0].item()))
+
+    completed_hypotheses.sort(key=lambda hyp: hyp.score, reverse=True)
+
     return completed_hypotheses
 
 

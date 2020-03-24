@@ -42,7 +42,6 @@ def main(args):
     word2Idx = json.loads(open(args.word2idx_file).read())
     idx2Word = {v: k for (k,v) in word2Idx.items()}
     
-    #vocab_size = len(word2Idx)
     vocab_size = word_vectors.size(0)
     print(f"Vocab size: {vocab_size}")
 
@@ -65,9 +64,6 @@ def main(args):
                     output_size=vocab_size,
                     device=device,
                     num_layers=args.num_layers)
-        elif args.model_type == "transformer":
-            return TransformerModel(vocab_size, device)
-
     # Get model
     log.info('Building model...')
     model = create_new_model()
@@ -126,7 +122,7 @@ def main(args):
                 #print(getWords(qw_idx.squeeze().tolist()))
                 #util.TeacherForce(model, word2Idx, Idx2Word, cw_idx, qw_idx, device)
                 #util.evaluateRandomly(model, word2Idx, Idx2Word, cw_idx, device)
-
+                
                 '''
 
                 hypotheses = util.beamSearch(model, word2Idx, Idx2Word, cw_idx, device)
