@@ -1,3 +1,12 @@
+"""The Annotated Transformer
+
+code copied from:
+    >http://nlp.seas.harvard.edu/2018/04/03/attention.html
+
+only used for debugging the TransformerModel implementation in models.py
+not used for model training
+"""
+
 import numpy as np
 import torch
 import torch.nn as nn
